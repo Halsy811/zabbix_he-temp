@@ -1,14 +1,20 @@
 zabbix_export:
-  version: '7.0'
+  version: '7.4'
   template_groups:
     - uuid: 7c2cb727f85b492d88cd56e17127c64d
       name: Templates/SAN
   templates:
     - uuid: 5e69410ac97d40bb9d2c336a06d92094
-      template: 'HPE MSA P2000 Storage by SNMP'
-      name: 'HPE MSA P2000 Storage by SNMP'
+      template: 'HPE MSA Storage by SNMP'
+      name: 'HPE MSA Storage by SNMP'
       description: |
-        Шаблон мониторинга HPE MSA P2000 G3 SAS по SNMPv2c (RFC 4044 FCMGMT-MIB, .1.3.6.1.3.94).
+        Шаблон мониторинга по SNMPv2c (RFC 4044 FCMGMT-MIB, .1.3.6.1.3.94).
+        
+        HPE MSA P2000 G3 SAS
+        MSA 2040 SAN
+        MSA 2050 SAN
+        MSA 2060 SAN
+        
         Источники данных проверены live на MSA P2000 G3 SAS: enterprise-ветка .1.3.6.1.4.1.232 практически пуста,
         вся телеметрия устройства отдаётся через FCMGMT: connUnit (статус/состояние/serial), датчики, порты, прошивки компонентов.
         Настройка: линкануть шаблон на хост, на интерфейсе SNMP задать community (по умолчанию {$SNMP_COMMUNITY}=public).
@@ -23,7 +29,6 @@ zabbix_export:
           key: hpe.msa.sysdescr
           delay: 1h
           value_type: CHAR
-          trends: '0'
           description: 'Описание системы из SNMPv2-MIB. Заодно проверяет доступность SNMP.'
         - uuid: e35d483331de4dd58feaf22e2aa3854b
           name: 'Аптайм SNMP-агента'
@@ -34,7 +39,7 @@ zabbix_export:
           description: 'sysUpTime.0 (TimeTicks). Отсутствие данных триггерится ниже.'
           triggers:
             - uuid: 2999d05725bb49a3acddf43314172da1
-              expression: 'nodata(/HPE MSA P2000 Storage by SNMP/hpe.msa.sysuptime,15m)=1'
+              expression: 'nodata(/HPE MSA Storage by SNMP/hpe.msa.sysuptime,15m)=1'
               name: 'SNMP: нет данных от MSA более 15 минут'
               priority: AVERAGE
               description: 'Проверить сеть, community и доступность устройства.'
@@ -55,7 +60,6 @@ zabbix_export:
               key: 'hpe.msa.fw.version[{#SNMPINDEX}]'
               delay: 1h
               value_type: CHAR
-              trends: '0'
               description: 'Версия компонента (connUnitRevsFirmRev), например T252R16-01 для контроллера.'
         - uuid: 56808fa435b1479aa27c95f7f8e20436
           name: 'Хостовые порты (SAS)'
@@ -86,7 +90,7 @@ zabbix_export:
                 name: 'HP P2000 port status'
               trigger_prototypes:
                 - uuid: 2270e31a3a854a778735bc885e54a496
-                  expression: 'last(/HPE MSA P2000 Storage by SNMP/hpe.msa.port.status[{#SNMPINDEX}])=5 or last(/HPE MSA P2000 Storage by SNMP/hpe.msa.port.status[{#SNMPINDEX}])=6'
+                  expression: 'last(/HPE MSA Storage by SNMP/hpe.msa.port.status[{#SNMPINDEX}])=5 or last(/HPE MSA Storage by SNMP/hpe.msa.port.status[{#SNMPINDEX}])=6'
                   name: 'Порт MSA не готов: {#PORT_NAME}'
                   priority: AVERAGE
                   description: 'connUnitPortStatus=5 (failure) или 6 (notparticipating) на {#PORT_NAME}.'
@@ -98,7 +102,7 @@ zabbix_export:
                 - drawtype: BOLD_LINE
                   color: 2774A4
                   item:
-                    host: 'HPE MSA P2000 Storage by SNMP'
+                    host: 'HPE MSA Storage by SNMP'
                     key: 'hpe.msa.port.state[{#SNMPINDEX}]'
             - uuid: 99830a57f6d74c77962bf68de49bc6a6
               name: 'MSA: статус порта {#PORT_NAME}'
@@ -107,7 +111,7 @@ zabbix_export:
                 - drawtype: BOLD_LINE
                   color: F63100
                   item:
-                    host: 'HPE MSA P2000 Storage by SNMP'
+                    host: 'HPE MSA Storage by SNMP'
                     key: 'hpe.msa.port.status[{#SNMPINDEX}]'
         - uuid: 46e26c5b1ff14b6ca8f9060bc3dd1370
           name: 'Датчики (температура, напряжение, ток)'
@@ -125,7 +129,6 @@ zabbix_export:
               key: 'hpe.msa.sensor.msg[{#SNMPINDEX}]'
               delay: 1h
               value_type: CHAR
-              trends: '0'
               description: 'connUnitSensorMessage: текущее показание датчика текстом (например «Temperature: 40 C»).'
             - uuid: 61945550ab4d42bcac39f303b687ad28
               name: 'Статус датчика: {#SENSOR_NAME}'
@@ -138,12 +141,12 @@ zabbix_export:
                 name: 'HP P2000 sensor status'
               trigger_prototypes:
                 - uuid: ad3f1b0849c448baaa405f50f5f25ec1
-                  expression: 'last(/HPE MSA P2000 Storage by SNMP/hpe.msa.sensor.status[{#SNMPINDEX}])=5'
+                  expression: 'last(/HPE MSA Storage by SNMP/hpe.msa.sensor.status[{#SNMPINDEX}])=5'
                   name: 'Датчик MSA ОТКАЗАЛ: {#SENSOR_NAME}'
                   priority: HIGH
                   description: 'connUnitSensorStatus=5 — отказ датчика ({#SENSOR_MSG}).'
                 - uuid: 912e5ed3ae414f5fabf4e25571ef8a52
-                  expression: 'last(/HPE MSA P2000 Storage by SNMP/hpe.msa.sensor.status[{#SNMPINDEX}])=4'
+                  expression: 'last(/HPE MSA Storage by SNMP/hpe.msa.sensor.status[{#SNMPINDEX}])=4'
                   name: 'Датчик MSA в состоянии WARNING: {#SENSOR_NAME}'
                   priority: AVERAGE
                   description: 'connUnitSensorStatus=4 — предупреждение от датчика ({#SENSOR_MSG}).'
@@ -169,7 +172,7 @@ zabbix_export:
                 - drawtype: BOLD_LINE
                   color: 1A7C11
                   item:
-                    host: 'HPE MSA P2000 Storage by SNMP'
+                    host: 'HPE MSA Storage by SNMP'
                     key: 'hpe.msa.sensor.value[{#SNMPINDEX}]'
         - uuid: 3c4bfe2af8d74dcf8268ec00c2770ecf
           name: 'Блоки управления (I/O Manager)'
@@ -187,7 +190,6 @@ zabbix_export:
               key: 'hpe.msa.unit.product[{#SNMPINDEX}]'
               delay: 1h
               value_type: CHAR
-              trends: '0'
               description: 'connUnitProduct: например HP P2000 G3 SAS.'
             - uuid: 45e5b2f5adcd422192ad8b86064a53c1
               name: 'Серийный номер блока управления'
@@ -196,7 +198,6 @@ zabbix_export:
               key: 'hpe.msa.unit.serial[{#SNMPINDEX}]'
               delay: 1h
               value_type: CHAR
-              trends: '0'
               description: 'connUnitSerial: серийный номер блока управления.'
             - uuid: c6389fdeed1c4764aacf90efcff5bce5
               name: 'Состояние блока управления'
@@ -209,7 +210,7 @@ zabbix_export:
                 name: 'HP P2000 connUnitState'
               trigger_prototypes:
                 - uuid: 901c3bd47e64470e84b916b62f60a677
-                  expression: 'last(/HPE MSA P2000 Storage by SNMP/hpe.msa.unit.state[{#SNMPINDEX}])<>2'
+                  expression: 'last(/HPE MSA Storage by SNMP/hpe.msa.unit.state[{#SNMPINDEX}])<>2'
                   name: 'Блок управления вне Online-состояния'
                   priority: AVERAGE
                   description: 'connUnitState != Online (2): unknown/offline.'
@@ -224,12 +225,12 @@ zabbix_export:
                 name: 'HP P2000 connUnitStatus'
               trigger_prototypes:
                 - uuid: d28662cb3b3646f78afe95f1d3c6318f
-                  expression: 'last(/HPE MSA P2000 Storage by SNMP/hpe.msa.unit.status[{#SNMPINDEX}])=5'
+                  expression: 'last(/HPE MSA Storage by SNMP/hpe.msa.unit.status[{#SNMPINDEX}])=5'
                   name: 'Статус блока управления: FAILED'
                   priority: HIGH
                   description: 'connUnitStatus=5: отказ компонента блока.'
                 - uuid: 1e63ce90d1cd49249fc55aeb48396891
-                  expression: 'last(/HPE MSA P2000 Storage by SNMP/hpe.msa.unit.status[{#SNMPINDEX}])=4'
+                  expression: 'last(/HPE MSA Storage by SNMP/hpe.msa.unit.status[{#SNMPINDEX}])=4'
                   name: 'Статус блока управления: WARNING'
                   priority: AVERAGE
                   description: 'connUnitStatus=4: компонент блока требует внимания.'
@@ -261,7 +262,7 @@ zabbix_export:
                     - type: GRAPH_PROTOTYPE
                       name: graphid.0
                       value:
-                        host: 'HPE MSA P2000 Storage by SNMP'
+                        host: 'HPE MSA Storage by SNMP'
                         name: 'MSA: значение датчика {#SENSOR_NAME}'
                     - type: STRING
                       name: reference
@@ -278,7 +279,7 @@ zabbix_export:
                     - type: GRAPH_PROTOTYPE
                       name: graphid.0
                       value:
-                        host: 'HPE MSA P2000 Storage by SNMP'
+                        host: 'HPE MSA Storage by SNMP'
                         name: 'MSA: статус порта {#PORT_NAME}'
                     - type: STRING
                       name: reference
@@ -296,7 +297,7 @@ zabbix_export:
                     - type: GRAPH_PROTOTYPE
                       name: graphid.0
                       value:
-                        host: 'HPE MSA P2000 Storage by SNMP'
+                        host: 'HPE MSA Storage by SNMP'
                         name: 'MSA: состояние порта {#PORT_NAME}'
                     - type: STRING
                       name: reference
