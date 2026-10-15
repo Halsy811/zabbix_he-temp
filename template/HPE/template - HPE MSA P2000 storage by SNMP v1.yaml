@@ -1,0 +1,273 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: 7c2cb727f85b492d88cd56e17127c64d
+      name: Templates/SAN
+  templates:
+    - uuid: 5e69410ac97d40bb9d2c336a06d92094
+      template: 'HPE MSA P2000 Storage by SNMP'
+      name: 'HPE MSA P2000 Storage by SNMP'
+      description: |
+        Шаблон мониторинга HPE MSA P2000 G3 SAS по SNMPv2c (RFC 4044 FCMGMT-MIB, .1.3.6.1.3.94).
+        Источники данных проверены live на MSA P2000 G3 SAS: enterprise-ветка .1.3.6.1.4.1.232 практически пуста,
+        вся телеметрия устройства отдаётся через FCMGMT: connUnit (статус/состояние/serial), датчики, порты, прошивки компонентов.
+        Настройка: линкануть шаблон на хост, на интерфейсе SNMP задать community (по умолчанию {$SNMP_COMMUNITY}=public).
+        Проверено на прошивке T252R16-01 (Bundle TS252P005). LLD: блоки обнаруживаются автоматически по {#SNMPINDEX}.
+      groups:
+        - name: Templates/SAN
+      items:
+        - uuid: 1381bdd2186e4895904c7e72e19e1afa
+          name: 'SNMP: sysDescr'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.1.1.0
+          key: hpe.msa.sysdescr
+          delay: 1h
+          value_type: CHAR
+          trends: '0'
+          description: 'Описание системы из SNMPv2-MIB. Заодно проверяет доступность SNMP.'
+        - uuid: e35d483331de4dd58feaf22e2aa3854b
+          name: 'Аптайм SNMP-агента'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.1.3.0
+          key: hpe.msa.sysuptime
+          units: uptime
+          description: 'sysUpTime.0 (TimeTicks). Отсутствие данных триггерится ниже.'
+          triggers:
+            - uuid: 2999d05725bb49a3acddf43314172da1
+              expression: 'nodata(/HPE MSA P2000 Storage by SNMP/hpe.msa.sysuptime,15m)=1'
+              name: 'SNMP: нет данных от MSA более 15 минут'
+              priority: AVERAGE
+              description: 'Проверить сеть, community и доступность устройства.'
+      discovery_rules:
+        - uuid: 107307a57a7145a2ad1c8336a0621450
+          name: 'Компоненты и версии ПО/прошивок'
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#COMPONENT_DESCR},.1.3.6.1.3.94.1.7.1.4,{#COMPONENT_VERSION},.1.3.6.1.3.94.1.7.1.3]'
+          key: hpe.msa.fw.discovery
+          delay: 1h
+          lifetime: 30d
+          description: 'LLD по connUnitRevsTable (FCMGMT .1.3.6.1.3.94.1.7): версии кода контроллеров, FPGA, CPLD, expander и прочих компонентов обоих I/O Manager.'
+          item_prototypes:
+            - uuid: 75784a166f2045d18d93b3793921012a
+              name: 'Версия: {#COMPONENT_DESCR}'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.3.94.1.7.1.3.{#SNMPINDEX}'
+              key: 'hpe.msa.fw.version[{#SNMPINDEX}]'
+              delay: 1h
+              value_type: CHAR
+              trends: '0'
+              description: 'Версия компонента (connUnitRevsFirmRev), например T252R16-01 для контроллера.'
+        - uuid: 56808fa435b1479aa27c95f7f8e20436
+          name: 'Хостовые порты (SAS)'
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#PORT_NAME},.1.3.6.1.3.94.1.10.1.17,{#PORT_STATUS},.1.3.6.1.3.94.1.10.1.7]'
+          key: hpe.msa.port.discovery
+          delay: 1h
+          lifetime: 30d
+          description: 'LLD по connUnitPortTable (FCMGMT .1.3.6.1.3.94.1.10): хостовые порты SAS (hostport_A1..B4 и др.).'
+          item_prototypes:
+            - uuid: e1c260d9b5784e7d8aeb94b0e0d2ad80
+              name: 'Состояние порта: {#PORT_NAME}'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.3.94.1.10.1.6.{#SNMPINDEX}'
+              key: 'hpe.msa.port.state[{#SNMPINDEX}]'
+              delay: 5m
+              description: 'connUnitPortState: 1 Unknown, 2 Online, 3 Offline, 4 Bypassed, 5 Diagnostics.'
+              valuemap:
+                name: 'HP P2000 port state'
+            - uuid: dd850f448f5f481ebc950eea2288239d
+              name: 'Статус порта: {#PORT_NAME}'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.3.94.1.10.1.7.{#SNMPINDEX}'
+              key: 'hpe.msa.port.status[{#SNMPINDEX}]'
+              delay: 5m
+              description: 'connUnitPortStatus: 1 Unknown, 2 Unused, 3 Ready, 4 Warning, 5 Failure, 6 Not participating, 7 Initializing, 8 Bypass, 9 OLS.'
+              valuemap:
+                name: 'HP P2000 port status'
+              trigger_prototypes:
+                - uuid: 2270e31a3a854a778735bc885e54a496
+                  expression: 'last(/HPE MSA P2000 Storage by SNMP/hpe.msa.port.status[{#SNMPINDEX}])=5 or last(/HPE MSA P2000 Storage by SNMP/hpe.msa.port.status[{#SNMPINDEX}])=6'
+                  name: 'Порт MSA не готов: {#PORT_NAME}'
+                  priority: AVERAGE
+                  description: 'connUnitPortStatus=5 (failure) или 6 (notparticipating) на {#PORT_NAME}.'
+        - uuid: 46e26c5b1ff14b6ca8f9060bc3dd1370
+          name: 'Датчики (температура, напряжение, ток)'
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#SENSOR_NAME},.1.3.6.1.3.94.1.8.1.3,{#SENSOR_STATUS},.1.3.6.1.3.94.1.8.1.4,{#SENSOR_MSG},.1.3.6.1.3.94.1.8.1.6]'
+          key: hpe.msa.sensor.discovery
+          delay: 1h
+          lifetime: 30d
+          description: 'LLD по connUnitSensorTable (FCMGMT .1.3.6.1.3.94.1.8): все аппаратные датчики устройства — температуры, напряжения, токи, заряд конденсаторов, статус юнита.'
+          item_prototypes:
+            - uuid: c2c6194b4bdd40c6a662ad99616ee58d
+              name: 'Сообщение датчика: {#SENSOR_NAME}'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.3.94.1.8.1.6.{#SNMPINDEX}'
+              key: 'hpe.msa.sensor.msg[{#SNMPINDEX}]'
+              delay: 1h
+              value_type: CHAR
+              trends: '0'
+              description: 'connUnitSensorMessage: текущее показание датчика текстом (например «Temperature: 40 C»).'
+            - uuid: 61945550ab4d42bcac39f303b687ad28
+              name: 'Статус датчика: {#SENSOR_NAME}'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.3.94.1.8.1.4.{#SNMPINDEX}'
+              key: 'hpe.msa.sensor.status[{#SNMPINDEX}]'
+              delay: 5m
+              description: 'connUnitSensorStatus: 1 Unknown, 2 Other, 3 OK, 4 Warning, 5 Failed.'
+              valuemap:
+                name: 'HP P2000 sensor status'
+              trigger_prototypes:
+                - uuid: ad3f1b0849c448baaa405f50f5f25ec1
+                  expression: 'last(/HPE MSA P2000 Storage by SNMP/hpe.msa.sensor.status[{#SNMPINDEX}])=5'
+                  name: 'Датчик MSA ОТКАЗАЛ: {#SENSOR_NAME}'
+                  priority: HIGH
+                  description: 'connUnitSensorStatus=5 — отказ датчика ({#SENSOR_MSG}).'
+                - uuid: 912e5ed3ae414f5fabf4e25571ef8a52
+                  expression: 'last(/HPE MSA P2000 Storage by SNMP/hpe.msa.sensor.status[{#SNMPINDEX}])=4'
+                  name: 'Датчик MSA в состоянии WARNING: {#SENSOR_NAME}'
+                  priority: AVERAGE
+                  description: 'connUnitSensorStatus=4 — предупреждение от датчика ({#SENSOR_MSG}).'
+        - uuid: 3c4bfe2af8d74dcf8268ec00c2770ecf
+          name: 'Блоки управления (I/O Manager)'
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#UNIT_PRODUCT},.1.3.6.1.3.94.1.6.1.7]'
+          key: hpe.msa.unit.discovery
+          delay: 1h
+          lifetime: 30d
+          description: 'LLD по connUnitTable (FCMGMT .1.3.6.1.3.94.1.6): блок управления, модель, статус, состояние, серийник, аптайм. {#SNMPINDEX} — OctetString connUnitId (для одного MSA — всегда один).'
+          item_prototypes:
+            - uuid: b54cc366ac5b4b46a14e1ba98215bdff
+              name: 'Модель блока управления'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.3.94.1.6.1.7.{#SNMPINDEX}'
+              key: 'hpe.msa.unit.product[{#SNMPINDEX}]'
+              delay: 1h
+              value_type: CHAR
+              trends: '0'
+              description: 'connUnitProduct: например HP P2000 G3 SAS.'
+            - uuid: 45e5b2f5adcd422192ad8b86064a53c1
+              name: 'Серийный номер блока управления'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.3.94.1.6.1.8.{#SNMPINDEX}'
+              key: 'hpe.msa.unit.serial[{#SNMPINDEX}]'
+              delay: 1h
+              value_type: CHAR
+              trends: '0'
+              description: 'connUnitSerial: серийный номер блока управления.'
+            - uuid: c6389fdeed1c4764aacf90efcff5bce5
+              name: 'Состояние блока управления'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.3.94.1.6.1.5.{#SNMPINDEX}'
+              key: 'hpe.msa.unit.state[{#SNMPINDEX}]'
+              delay: 5m
+              description: 'connUnitState: 1 Unknown, 2 Online, 3 Offline.'
+              valuemap:
+                name: 'HP P2000 connUnitState'
+              trigger_prototypes:
+                - uuid: 901c3bd47e64470e84b916b62f60a677
+                  expression: 'last(/HPE MSA P2000 Storage by SNMP/hpe.msa.unit.state[{#SNMPINDEX}])<>2'
+                  name: 'Блок управления вне Online-состояния'
+                  priority: AVERAGE
+                  description: 'connUnitState != Online (2): unknown/offline.'
+            - uuid: 87cfdca06d724b8a8d9887238351fc69
+              name: 'Статус блока управления'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.3.94.1.6.1.6.{#SNMPINDEX}'
+              key: 'hpe.msa.unit.status[{#SNMPINDEX}]'
+              delay: 5m
+              description: 'connUnitStatus (единственная контрольная точка состояния юнита): 1 Unknown, 2 Unused, 3 OK, 4 Warning, 5 Failed.'
+              valuemap:
+                name: 'HP P2000 connUnitStatus'
+              trigger_prototypes:
+                - uuid: d28662cb3b3646f78afe95f1d3c6318f
+                  expression: 'last(/HPE MSA P2000 Storage by SNMP/hpe.msa.unit.status[{#SNMPINDEX}])=5'
+                  name: 'Статус блока управления: FAILED'
+                  priority: HIGH
+                  description: 'connUnitStatus=5: отказ компонента блока.'
+                - uuid: 1e63ce90d1cd49249fc55aeb48396891
+                  expression: 'last(/HPE MSA P2000 Storage by SNMP/hpe.msa.unit.status[{#SNMPINDEX}])=4'
+                  name: 'Статус блока управления: WARNING'
+                  priority: AVERAGE
+                  description: 'connUnitStatus=4: компонент блока требует внимания.'
+            - uuid: da3b916231454d03b083d24e5f0b3838
+              name: 'Аптайм блока управления'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.3.94.1.6.1.9.{#SNMPINDEX}'
+              key: 'hpe.msa.unit.uptime[{#SNMPINDEX}]'
+              delay: 5m
+              description: 'connUnitUpTime (centiseconds).'
+      macros:
+        - macro: '{$SNMP_COMMUNITY}'
+          value: public
+          description: 'SNMPv2c community по умолчанию; меняется на хосте при необходимости'
+      valuemaps:
+        - uuid: a7769e78524945438796cbbde45d3252
+          name: 'HP P2000 connUnitState'
+          mappings:
+            - value: '1'
+              newvalue: Unknown
+            - value: '2'
+              newvalue: Online
+            - value: '3'
+              newvalue: Offline
+        - uuid: d6b760d4d7d942a481c6d765395dfd97
+          name: 'HP P2000 connUnitStatus'
+          mappings:
+            - value: '1'
+              newvalue: Unknown
+            - value: '2'
+              newvalue: Unused
+            - value: '3'
+              newvalue: OK
+            - value: '4'
+              newvalue: Warning
+            - value: '5'
+              newvalue: Failed
+        - uuid: 463830bbf5f34879ad3c36b3a7b61a66
+          name: 'HP P2000 port state'
+          mappings:
+            - value: '1'
+              newvalue: Unknown
+            - value: '2'
+              newvalue: Online
+            - value: '3'
+              newvalue: Offline
+            - value: '4'
+              newvalue: Bypassed
+            - value: '5'
+              newvalue: Diagnostics
+        - uuid: 86542a0b7e8846beb9ea78f16a562de9
+          name: 'HP P2000 port status'
+          mappings:
+            - value: '1'
+              newvalue: Unknown
+            - value: '2'
+              newvalue: Unused
+            - value: '3'
+              newvalue: Ready
+            - value: '4'
+              newvalue: Warning
+            - value: '5'
+              newvalue: Failure
+            - value: '6'
+              newvalue: 'Not participating'
+            - value: '7'
+              newvalue: Initializing
+            - value: '8'
+              newvalue: Bypass
+            - value: '9'
+              newvalue: OLS
+        - uuid: 85cd003d76904777bfae3920f493e527
+          name: 'HP P2000 sensor status'
+          mappings:
+            - value: '1'
+              newvalue: Unknown
+            - value: '2'
+              newvalue: Other
+            - value: '3'
+              newvalue: OK
+            - value: '4'
+              newvalue: Warning
+            - value: '5'
+              newvalue: Failed
