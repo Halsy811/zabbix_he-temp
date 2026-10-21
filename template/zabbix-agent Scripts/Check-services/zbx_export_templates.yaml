@@ -1,0 +1,101 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: a571c0d144b14fd4a87a9d9b2aa9fcd6
+      name: Templates/Applications
+  templates:
+    - uuid: c19cc982dedd4c2c908119cbbfee1b8e
+      template: 'Windows Services State by Agent Script'
+      name: 'Windows Services State by Agent Script'
+      description: |
+        Мониторинг состояний служб Windows по списку из макроса {$SERVICELIST} (разделитель ';').
+        Скрипт service-check.ps1 запускается zabbix-агентом (UserParameter, активные проверки) на хосте со службами и возвращает JSON; LLD создаёт по каждой службе элемент service.state[<служба>] и триггеры.
+        Макросы узла: {$SERVICELIST} = список служб; {$HOST} = хост, где работают службы (127.0.0.1/localhost = локальный хост агента).
+      groups:
+        - name: Templates/Applications
+      items:
+        - uuid: 0652894c48dc4b94a2c7c0f7891fa617
+          name: 'Состояния служб: JSON от скрипта'
+          key: 'service.check["{$SERVICELIST}","{$HOST}"]'
+          history: 7d
+          value_type: TEXT
+          trends: '0'
+          description: |
+            Мастер-элемент. Сервер передаёт агенту ключ с раскрытыми макросами узла, агент по UserParameter запускает service-check.ps1 и передаёт JSON {"data":[{"{#SERVICE}":"<служба>","state":"<состояние>"}]}.
+            UserParameter=service.check[*],powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Zabbix Agent\scripts\service-check.ps1" "$1" "$2"
+            В конфиге агента также: Timeout=30, ServerActive=<IP сервера>, Hostname=<техническое имя узла>.
+          triggers:
+            - uuid: c20c514c0a7c4553a998662f77214e6e
+              expression: 'nodata(/Windows Services State by Agent Script/service.check["{$SERVICELIST}","{$HOST}"],10m)=1'
+              name: 'Нет данных о состояниях служб'
+              priority: AVERAGE
+              description: 'Агент не передаёт данные 10 минут: агент остановлен, не настроен UserParameter/Hostname/ServerActive или скрипт падает.'
+              manual_close: 'YES'
+        - uuid: cc707e1f42af4f2ca36e1627dd0f6746
+          name: 'Состояния служб: траппер (опционально)'
+          type: TRAP
+          key: service.states
+          delay: '0'
+          history: 7d
+          value_type: TEXT
+          trends: '0'
+          description: 'Не используется в базовой схеме. Опционально: если в service-check.ps1 выставить $SendTrap=$true, скрипт дополнительно отправит этот же JSON через zabbix_sender в этот траппер-элемент.'
+      discovery_rules:
+        - uuid: 73887ebbb762411e94f91804b77095eb
+          name: 'Обнаружение служб (из {$SERVICELIST})'
+          type: DEPENDENT
+          key: service.discovery
+          delay: '0'
+          description: 'Зависимое LLD от мастер-элемента. Макрос {#SERVICE} берётся автоматически из ключей JSON, который возвращает service-check.ps1.'
+          item_prototypes:
+            - uuid: 40e063429ad546489bb502dfd4229554
+              name: 'Служба {#SERVICE}: состояние'
+              type: DEPENDENT
+              key: 'service.state[{#SERVICE}]'
+              delay: '0'
+              history: 7d
+              value_type: TEXT
+              trends: '0'
+              description: 'Состояние службы из общего JSON: Running/Stopped/Paused/StartPending/StopPending/PausePending/ContinuePending; NotFound/AccessDenied/Unreachable/Error при проблемах проверки.'
+              preprocessing:
+                - type: REGEX
+                  parameters:
+                    - '"\{#SERVICE\}":"[^"]*","state":"([^"]+)"'
+                    - \1
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: 'service.check["{$SERVICELIST}","{$HOST}"]'
+              trigger_prototypes:
+                - uuid: 106e6cd6c0104dafba45d8876bf70ce7
+                  expression: 'find(/Windows Services State by Agent Script/service.state[{#SERVICE}],,"like","NotFound")=1 or find(/Windows Services State by Agent Script/service.state[{#SERVICE}],,"like","AccessDenied")=1 or find(/Windows Services State by Agent Script/service.state[{#SERVICE}],,"like","Unreachable")=1 or find(/Windows Services State by Agent Script/service.state[{#SERVICE}],,"like","Error")=1'
+                  name: 'Служба {#SERVICE}: не найдена / нет доступа / хост недоступен'
+                  priority: AVERAGE
+                  description: 'Скрипт не смог определить состояние: служба отсутствует (проверьте ServiceName в {$SERVICELIST}), отказ в доступе или недоступен хост {$HOST}.'
+                  tags:
+                    - tag: scope
+                      value: availability
+                    - tag: service
+                      value: '{#SERVICE}'
+                - uuid: 2c4752bc8fce4d8fb4ad2dcf30277d99
+                  expression: 'find(/Windows Services State by Agent Script/service.state[{#SERVICE}],,"like","Stopped")=1 or find(/Windows Services State by Agent Script/service.state[{#SERVICE}],,"like","Paused")=1'
+                  name: 'Служба {#SERVICE} не работает (Stopped/Paused)'
+                  priority: HIGH
+                  description: 'Служба остановлена или на паузе. Если состояние намеренное — отключите триггер для этой службы (наследование на узле).'
+                  tags:
+                    - tag: scope
+                      value: availability
+                    - tag: service
+                      value: '{#SERVICE}'
+          master_item:
+            key: 'service.check["{$SERVICELIST}","{$HOST}"]'
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.data
+      macros:
+        - macro: '{$HOST}'
+          value: 127.0.0.1
+          description: 'Хост, на котором проверять службы (IP/имя). 127.0.0.1/localhost = локальный хост агента. Задаётся в макросах узла.'
+        - macro: '{$SERVICELIST}'
+          value: RarusTAPIServer;ModuleAsteriskSP
+          description: 'Список служб через '';'' (ServiceName, не отображаемое имя). Задаётся в макросах узла.'
