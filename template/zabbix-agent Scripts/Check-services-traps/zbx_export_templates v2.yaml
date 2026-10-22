@@ -1,0 +1,82 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: a571c0d144b14fd4a87a9d9b2aa9fcd6
+      name: Templates/Applications
+  templates:
+    - uuid: c19cc982dedd4c2c908119cbbfee1b8e
+      template: 'Windows Services State by Agent Script - Traps v2'
+      name: 'Windows Services State by Agent Script - Traps v2'
+      description: |
+        Скрипт вызывается агентом. Упрощен
+        
+        СХЕМА ЧЕРЕЗ АГЕНТА: активный элемент service.check.trap (1m) запускает zbx-service-check-traps.ps1; скрипт берёт список служб из своего блока CONFIG ($ServiceList), проверяет их (Get-Service) и выводит JSON в stdout; АГЕНТ сам передаёт этот вывод на сервер. LLD (зависимый от service.check.trap) создаёт service.state[<служба>] и триггеры. Без трапперов и zabbix_sender.
+      groups:
+        - name: Templates/Applications
+      items:
+        - uuid: 0652894c48dc4b94a2c7c0f7891fa617
+          name: 'Проверка служб и отправка трапа (статус отправки)'
+          type: ZABBIX_ACTIVE
+          key: service.check.trap
+          history: 2d
+          value_type: TEXT
+          description: 'Агент (активные проверки) запускает service-check.ps1 по расписанию этого элемента. Скрипт берёт список служб из СВОЕГО конфига ($ServiceList внутри скрипта), проверяет их и ОТПРАВЛЯЕТ результат трапом (zabbix_sender -> service.states, порт 10051). Значение элемента — статус отправки: ''OK: processed: 1...'' или ''FAIL: ...''.'
+          triggers:
+            - uuid: 9a42cb5321bb4ef495558aaa2666cf58
+              expression: 'nodata(/Windows Services State by Agent Script - Traps v2/service.check.trap,10m)=1'
+              name: 'Нет данных о состояниях служб'
+              priority: AVERAGE
+              description: 'Агент не передаёт данные 10 минут: агент остановлен, UserParameter указывает на несуществующий скрипт или нет связи с сервером.'
+              manual_close: 'YES'
+      discovery_rules:
+        - uuid: 73887ebbb762411e94f91804b77095eb
+          name: 'Обнаружение служб (из {$SERVICELIST})'
+          type: DEPENDENT
+          key: service.discovery.traps.scr
+          description: 'Зависимое LLD от мастер-элемента. Макрос {#SERVICE} берётся автоматически из ключей JSON, который возвращает service-check.ps1.'
+          item_prototypes:
+            - uuid: 40e063429ad546489bb502dfd4229554
+              name: 'Служба {#SERVICE}: состояние'
+              type: DEPENDENT
+              key: 'service.state[{#SERVICE}]'
+              history: 2d
+              value_type: TEXT
+              description: 'Состояние службы из общего JSON: Running/Stopped/Paused/StartPending/StopPending/PausePending/ContinuePending; NotFound/AccessDenied/Unreachable/Error при проблемах проверки.'
+              preprocessing:
+                - type: REGEX
+                  parameters:
+                    - '"\{#SERVICE\}":"[^"]*","state":"([^"]+)"'
+                    - \1
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: service.check.trap
+              tags:
+                - tag: host_service
+                  value: '{#SERVICE}'
+              trigger_prototypes:
+                - uuid: 106e6cd6c0104dafba45d8876bf70ce7
+                  expression: 'find(/Windows Services State by Agent Script - Traps v2/service.state[{#SERVICE}],,"like","NotFound")=1 or find(/Windows Services State by Agent Script - Traps v2/service.state[{#SERVICE}],,"like","AccessDenied")=1 or find(/Windows Services State by Agent Script - Traps v2/service.state[{#SERVICE}],,"like","Unreachable")=1 or find(/Windows Services State by Agent Script - Traps v2/service.state[{#SERVICE}],,"like","Error")=1'
+                  name: 'Служба {#SERVICE}: не найдена / нет доступа / хост недоступен'
+                  priority: AVERAGE
+                  description: 'Скрипт не смог определить состояние: служба отсутствует (проверьте ServiceName в {$SERVICELIST}), отказ в доступе или недоступен хост {$HOST}.'
+                  tags:
+                    - tag: hide_notifications
+                      value: '3:55-4:15'
+                    - tag: service
+                      value: '{#SERVICE}'
+                - uuid: 2c4752bc8fce4d8fb4ad2dcf30277d99
+                  expression: 'find(/Windows Services State by Agent Script - Traps v2/service.state[{#SERVICE}],,"like","Stopped")=1 or find(/Windows Services State by Agent Script - Traps v2/service.state[{#SERVICE}],,"like","Paused")=1'
+                  name: 'Служба {#SERVICE} не работает (Stopped/Paused)'
+                  priority: HIGH
+                  description: 'Служба остановлена или на паузе. Если состояние намеренное — отключите триггер для этой службы (наследование на узле).'
+                  tags:
+                    - tag: hide_notifications
+                      value: '3:55-4:15'
+                    - tag: service
+                      value: '{#SERVICE}'
+          master_item:
+            key: service.check.trap
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.data

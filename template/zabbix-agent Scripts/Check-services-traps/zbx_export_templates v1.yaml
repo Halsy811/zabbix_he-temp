@@ -1,0 +1,99 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: a571c0d144b14fd4a87a9d9b2aa9fcd6
+      name: Templates/Applications
+  templates:
+    - uuid: c19cc982dedd4c2c908119cbbfee1b8e
+      template: 'Windows Services State by Agent Script - Traps'
+      name: 'Windows Services State by Agent Script - Traps'
+      description: |
+        ТРАП-СХЕМА: мониторинг состояний служб Windows.
+        На хосте агент (активный элемент service.check.trap, 1m) запускает service-check.ps1; скрипт берёт список служб из своего конфиг-блока ($ServiceList), проверяет их (Get-Service, локально или на {$...}-хосте из своего конфига) и отправляет результат трапом через zabbix_sender в элемент service.states (порт 10051, только исходящий трафик с хоста).
+        LLD (зависимый от service.states) создаёт service.state[<служба>] и триггеры.
+        Список служб задаётся В СКРИПТЕ на хосте — серверные макросы не используются.
+      groups:
+        - name: Templates/Applications
+      items:
+        - uuid: 0652894c48dc4b94a2c7c0f7891fa617
+          name: 'Проверка служб и отправка трапа (статус отправки)'
+          type: ZABBIX_ACTIVE
+          key: service.check.trap
+          history: 7d
+          value_type: TEXT
+          trends: '0'
+          description: 'Агент (активные проверки) запускает service-check.ps1 по расписанию этого элемента. Скрипт берёт список служб из СВОЕГО конфига ($ServiceList внутри скрипта), проверяет их и ОТПРАВЛЯЕТ результат трапом (zabbix_sender -> service.states, порт 10051). Значение элемента — статус отправки: ''OK: processed: 1...'' или ''FAIL: ...''.'
+          triggers:
+            - uuid: 3721d45d70614eca957e06a3ba82f02c
+              expression: 'find(/Windows Services State by Agent Script - Traps/service.check.trap,,"like","FAIL")=1'
+              name: 'Ошибка отправки трапа / выполнения проверки служб'
+              priority: AVERAGE
+              description: 'Скрипт на хосте сообщил об ошибке: zabbix_sender не найден, сервер недоступен, отказ в отправке. Подробности в значении элемента.'
+        - uuid: cc707e1f42af4f2ca36e1627dd0f6746
+          name: 'Состояния служб (трапы от агентов)'
+          type: TRAP
+          key: service.states
+          delay: '0'
+          history: 7d
+          value_type: TEXT
+          trends: '0'
+          description: 'Источник данных схемы. Сюда zabbix_sender (запускается скриптом на хосте) кладёт JSON: {"data":[{"{#SERVICE}":"<служба>","state":"<состояние>"}]}. LLD и все элементы service.state[...] питаются от этого элемента.'
+          triggers:
+            - uuid: 0ebc71201f314d62aa34326038a73f34
+              expression: 'nodata(/Windows Services State by Agent Script - Traps/service.states,10m)=1'
+              name: 'Нет данных о состояниях служб'
+              priority: AVERAGE
+              description: 'Трапы не приходят 10 минут: агент остановлен, скрипт не запускается, zabbix_sender не найден или нет сети до сервера (10051).'
+              manual_close: 'YES'
+      discovery_rules:
+        - uuid: 73887ebbb762411e94f91804b77095eb
+          name: 'Обнаружение служб (из {$SERVICELIST})'
+          type: DEPENDENT
+          key: service.discovery
+          delay: '0'
+          description: 'Зависимое LLD от мастер-элемента. Макрос {#SERVICE} берётся автоматически из ключей JSON, который возвращает service-check.ps1.'
+          item_prototypes:
+            - uuid: 40e063429ad546489bb502dfd4229554
+              name: 'Служба {#SERVICE}: состояние'
+              type: DEPENDENT
+              key: 'service.state[{#SERVICE}]'
+              delay: '0'
+              history: 7d
+              value_type: TEXT
+              trends: '0'
+              description: 'Состояние службы из общего JSON: Running/Stopped/Paused/StartPending/StopPending/PausePending/ContinuePending; NotFound/AccessDenied/Unreachable/Error при проблемах проверки.'
+              preprocessing:
+                - type: REGEX
+                  parameters:
+                    - '"\{#SERVICE\}":"[^"]*","state":"([^"]+)"'
+                    - \1
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: service.states
+              trigger_prototypes:
+                - uuid: 106e6cd6c0104dafba45d8876bf70ce7
+                  expression: 'find(/Windows Services State by Agent Script - Traps/service.state[{#SERVICE}],,"like","NotFound")=1 or find(/Windows Services State by Agent Script - Traps/service.state[{#SERVICE}],,"like","AccessDenied")=1 or find(/Windows Services State by Agent Script - Traps/service.state[{#SERVICE}],,"like","Unreachable")=1 or find(/Windows Services State by Agent Script - Traps/service.state[{#SERVICE}],,"like","Error")=1'
+                  name: 'Служба {#SERVICE}: не найдена / нет доступа / хост недоступен'
+                  priority: AVERAGE
+                  description: 'Скрипт не смог определить состояние: служба отсутствует (проверьте ServiceName в {$SERVICELIST}), отказ в доступе или недоступен хост {$HOST}.'
+                  tags:
+                    - tag: hide_notifications
+                      value: '3:55-4:15'
+                    - tag: service
+                      value: '{#SERVICE}'
+                - uuid: 2c4752bc8fce4d8fb4ad2dcf30277d99
+                  expression: 'find(/Windows Services State by Agent Script - Traps/service.state[{#SERVICE}],,"like","Stopped")=1 or find(/Windows Services State by Agent Script - Traps/service.state[{#SERVICE}],,"like","Paused")=1'
+                  name: 'Служба {#SERVICE} не работает (Stopped/Paused)'
+                  priority: HIGH
+                  description: 'Служба остановлена или на паузе. Если состояние намеренное — отключите триггер для этой службы (наследование на узле).'
+                  tags:
+                    - tag: hide_notifications
+                      value: '3:55-4:15'
+                    - tag: service
+                      value: '{#SERVICE}'
+          master_item:
+            key: service.states
+          preprocessing:
+            - type: JSONPATH
+              parameters:
+                - $.data
