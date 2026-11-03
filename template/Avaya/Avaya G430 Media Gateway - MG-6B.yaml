@@ -1,0 +1,714 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: 36bff6c29af64692839d077febfc7079
+      name: 'Templates/Network devices'
+    - uuid: 1d12408342854fd5a4436dd6d5d1bd4a
+      name: Templates/Telephony
+  templates:
+    - uuid: 8f9bf7d0baa64be389d47d6ed3675a88
+      template: 'Avaya G430 Media Gateway by SNMP'
+      name: 'Avaya G430 Media Gateway by SNMP'
+      description: 'Custom template for Avaya G430 Media Gateway (sysObjectID .1.3.6.1.4.1.6889.1.45.103.41, SW 36.x). Modeled after official HP Enterprise Switch by SNMP. Monitors: ICMP reachability, SNMP availability, system, ENTITY-MIB inventory (chassis/modules/DSP/PSU with serials), ENTITY-SENSOR-MIB ambient temperature and fan speeds, ifTable per-interface traffic (32-bit counters: HC counters are BROKEN on G430 - high word duplicated)/errors/discards. NOTE: this agent does not support GETBULK - interface must be bulk=0, and keep polling intervals moderate (3m+).'
+      groups:
+        - name: 'Templates/Network devices'
+        - name: Templates/Telephony
+      items:
+        - uuid: 24c43dad702e44eab491a9427193eecb
+          name: 'ICMP ping'
+          type: SIMPLE
+          key: icmpping
+          history: 90d
+          trends: 200d
+          description: 'Host accessibility by ICMP ping. 0 - fails, 1 - successful.'
+          valuemap:
+            name: 'ICMP status'
+          triggers:
+            - uuid: a5e6aff3dc8f422d8c1150b605611820
+              expression: 'max(/Avaya G430 Media Gateway by SNMP/icmpping,#3)=0'
+              name: 'Avaya G430 Media Gateway by SNMP: Unavailable by ICMP ping'
+              priority: HIGH
+              description: 'Last three attempts returned timeout. Check device connectivity.'
+        - uuid: 4503b9268d9f4afcb8a8cb58ffc3e06d
+          name: 'ICMP loss'
+          type: SIMPLE
+          key: icmppingloss
+          history: 90d
+          value_type: FLOAT
+          units: '%'
+          triggers:
+            - uuid: 0670de85fa244b1f8ca4f2efa584c5fe
+              expression: 'min(/Avaya G430 Media Gateway by SNMP/icmppingloss,5m)>{$ICMP_LOSS_WARN} and min(/Avaya G430 Media Gateway by SNMP/icmppingloss,5m)<100'
+              name: 'Avaya G430 Media Gateway by SNMP: High ICMP ping loss'
+              opdata: 'Loss: {ITEM.LASTVALUE1}'
+              priority: WARNING
+              description: 'ICMP packet loss detected.'
+              dependencies:
+                - name: 'Avaya G430 Media Gateway by SNMP: Unavailable by ICMP ping'
+                  expression: 'max(/Avaya G430 Media Gateway by SNMP/icmpping,#3)=0'
+        - uuid: 899f4f53a53b41268d754a2b0ff969c4
+          name: 'ICMP response time'
+          type: SIMPLE
+          key: icmppingsec
+          history: 90d
+          value_type: FLOAT
+          units: s
+          triggers:
+            - uuid: 42c35ac42f3445adbb1a8ca88067c2f7
+              expression: 'avg(/Avaya G430 Media Gateway by SNMP/icmppingsec,5m)>{$ICMP_RESPONSE_TIME_WARN}'
+              name: 'Avaya G430 Media Gateway by SNMP: High ICMP ping response time'
+              opdata: 'Time: {ITEM.LASTVALUE1}'
+              priority: WARNING
+              description: 'Average ICMP response time is too high.'
+              dependencies:
+                - name: 'Avaya G430 Media Gateway by SNMP: Unavailable by ICMP ping'
+                  expression: 'max(/Avaya G430 Media Gateway by SNMP/icmpping,#3)=0'
+        - uuid: a481463464464467bcabbc2f3a530606
+          name: 'System contact'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.4.0
+          key: system.contact
+          delay: 1h
+          history: 30d
+          value_type: CHAR
+          trends: '0'
+        - uuid: baf9a43756284a0493b3a3579863245c
+          name: 'System description'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.1.0
+          key: system.descr
+          delay: 1h
+          history: 30d
+          value_type: CHAR
+          trends: '0'
+          description: 'Contains HW/FW/SW revision: "Ethernet Routing Switch 4850GTS HW:12 FW:5.8.0.1 SW:v5.11.1.101".'
+        - uuid: 8d7430173a7542c09e7aa10bdc450df7
+          name: 'System location'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.6.0
+          key: system.location
+          delay: 1h
+          history: 30d
+          value_type: CHAR
+          trends: '0'
+        - uuid: 500b2608b9134beda70cce2fae572fbe
+          name: 'System name'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.5.0
+          key: system.name
+          delay: 15m
+          history: 30d
+          value_type: CHAR
+          trends: '0'
+          triggers:
+            - uuid: 7e0622f2bfe74860b6e681d5223ec833
+              expression: 'last(/Avaya G430 Media Gateway by SNMP/system.name)<>last(/Avaya G430 Media Gateway by SNMP/system.name,#2) and length(last(/Avaya G430 Media Gateway by SNMP/system.name))>0'
+              name: 'Avaya G430 Media Gateway by SNMP: System name has changed'
+              priority: INFO
+              description: 'New name: {ITEM.VALUE}'
+              manual_close: 'YES'
+        - uuid: d4ab298758394ba6bf6ccc4eae935fce
+          name: 'System object ID'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.2.0
+          key: system.objectid
+          delay: 1h
+          history: 30d
+          value_type: CHAR
+          trends: '0'
+        - uuid: b952bfde98e244eda90117fcbd08f249
+          name: 'Uptime (network)'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.3.0
+          key: system.uptime
+          delay: 3m
+          history: 30d
+          trends: 200d
+          units: s
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - '0.01'
+          triggers:
+            - uuid: fa4c0561c00e44c796e48c9e24e59413
+              expression: 'last(/Avaya G430 Media Gateway by SNMP/system.uptime)<600'
+              name: 'Avaya G430 Media Gateway by SNMP: Device has been restarted (uptime < 10 min)'
+              opdata: 'Uptime: {ITEM.LASTVALUE1}'
+              priority: WARNING
+              description: 'sysUpTime is less than 10 minutes.'
+              manual_close: 'YES'
+        - uuid: f787453481504ef39d52f127dd84e476
+          name: 'SNMP agent availability'
+          type: INTERNAL
+          key: 'zabbix[host,snmp,available]'
+          history: 90d
+          trends: 200d
+          description: 'Availability of SNMP checks on the host.'
+          valuemap:
+            name: 'SNMP agent availability'
+          triggers:
+            - uuid: 6c69b551d42b4bc2a843ee496dda5d18
+              expression: 'max(/Avaya G430 Media Gateway by SNMP/zabbix[host,snmp,available],10m)=2'
+              name: 'Avaya G430 Media Gateway by SNMP: No SNMP data collection'
+              priority: WARNING
+              description: 'SNMP check errors for 10 minutes. Check interface, community and ACL on the device.'
+              manual_close: 'YES'
+              dependencies:
+                - name: 'Avaya G430 Media Gateway by SNMP: Unavailable by ICMP ping'
+                  expression: 'max(/Avaya G430 Media Gateway by SNMP/icmpping,#3)=0'
+      discovery_rules:
+        - uuid: 87c62c8b8feb425286687f0877ba0dee
+          name: 'Entity Discovery'
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#ENT_CLASS},.1.3.6.1.2.1.47.1.1.1.1.5,{#ENT_NAME},.1.3.6.1.2.1.47.1.1.1.1.7]'
+          key: entity.physical.discovery
+          delay: 1h
+          lifetime: 30d
+          description: 'Discovers ENTITY-MIB entities: chassis (serial!) and 50 ports.'
+          item_prototypes:
+            - uuid: 3360c6028651483283a2cf634fd85c8d
+              name: '{#ENT_NAME}: Class'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.5.{#SNMPINDEX}'
+              key: 'entity.class[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              trends: 200d
+              valuemap:
+                name: 'Entity class'
+            - uuid: 243cd21f04aa4cc999baf52b70855e57
+              name: '{#ENT_NAME}: Field replaceable'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.16.{#SNMPINDEX}'
+              key: 'entity.fru[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              trends: 200d
+              valuemap:
+                name: Boolean
+            - uuid: f2fcd348f66448478a24a449f4374cbd
+              name: '{#ENT_NAME}: Hardware version(revision)'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.8.{#SNMPINDEX}'
+              key: 'entity.hwrev[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              value_type: CHAR
+              trends: '0'
+              description: entPhysicalHardwareRev.
+            - uuid: efd62752779642fab286b83f687656cc
+              name: '{#ENT_NAME}: Manufacturer'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.12.{#SNMPINDEX}'
+              key: 'entity.mfg[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              value_type: CHAR
+              trends: '0'
+            - uuid: 2a3db8f90fde4f138309e9e4946719ad
+              name: '{#ENT_NAME}: Hardware model name'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.2.{#SNMPINDEX}'
+              key: 'entity.model[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              value_type: CHAR
+              trends: '0'
+              description: 'entPhysicalDescr (model string on G430).'
+            - uuid: 177c82930bf84286bb8ca2d7773516a5
+              name: '{#ENT_NAME}: Hardware serial number'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.11.{#SNMPINDEX}'
+              key: 'entity.serial[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              value_type: CHAR
+              trends: '0'
+              description: 'entPhysicalSerialNum; filled for chassis.'
+        - uuid: 35ff8d3e1ff54c3fb1cdf0690a53ee98
+          name: 'Network interfaces discovery'
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#IFOPERSTATUS},.1.3.6.1.2.1.2.2.1.8,{#IFADMINSTATUS},.1.3.6.1.2.1.2.2.1.7,{#IFALIAS},.1.3.6.1.2.1.31.1.1.1.18,{#IFNAME},.1.3.6.1.2.1.31.1.1.1.1,{#IFDESCR},.1.3.6.1.2.1.2.2.1.2,{#IFTYPE},.1.3.6.1.2.1.2.2.1.3]'
+          key: net.if.discovery
+          delay: 1h
+          filter:
+            evaltype: AND
+            conditions:
+              - macro: '{#IFADMINSTATUS}'
+                value: '{$NET.IF.IFADMINSTATUS.MATCHES}'
+                formulaid: A
+              - macro: '{#IFADMINSTATUS}'
+                value: '{$NET.IF.IFADMINSTATUS.NOT_MATCHES}'
+                operator: NOT_MATCHES_REGEX
+                formulaid: B
+              - macro: '{#IFNAME}'
+                value: '{$NET.IF.IFNAME.MATCHES}'
+                formulaid: C
+              - macro: '{#IFNAME}'
+                value: '{$NET.IF.IFNAME.NOT_MATCHES}'
+                operator: NOT_MATCHES_REGEX
+                formulaid: D
+              - macro: '{#IFTYPE}'
+                value: ^(1|6|62|135)$
+                formulaid: E
+          lifetime: 30d
+          description: 'Discovers physical ports (ifType=6, 48 x 10/100/1000 + SFP combo). Counters from RFC1213 ifTable and 64-bit ifXTable.'
+          item_prototypes:
+            - uuid: 0c6bf0f958774c9ba38032c1fdedee4e
+              name: 'Interface {#IFDESCR}: Administrative status'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.7.{#SNMPINDEX}'
+              key: 'net.if.admin[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              valuemap:
+                name: 'IF administrative status'
+            - uuid: f8907b1f7ac24249901dc81126fafc18
+              name: 'Interface {#IFDESCR}: Bits received'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.10.{#SNMPINDEX}'
+              key: 'net.if.in.bytes[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              units: bps
+              description: 'RFC1213 32-bit counter (HC counters are broken on G430).'
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+                - type: MULTIPLIER
+                  parameters:
+                    - '8'
+            - uuid: e50870d8453546768c33982cc69a3f55
+              name: 'Interface {#IFDESCR}: Inbound packets discarded'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.13.{#SNMPINDEX}'
+              key: 'net.if.in.discards[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+              trigger_prototypes:
+                - uuid: abe1be79a1d94323956bcfe549fa509f
+                  expression: 'min(/Avaya G430 Media Gateway by SNMP/net.if.in.discards[{#SNMPINDEX}],5m)>{$IF.ERRORS.WARN}'
+                  name: 'Interface {#IFDESCR}: High inbound discards'
+                  priority: WARNING
+                  description: 'More than {$IF.ERRORS.WARN} discards per second for 5 minutes.'
+            - uuid: d22da28b361240f08607a3965019ae63
+              name: 'Interface {#IFDESCR}: Inbound packets with errors'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.14.{#SNMPINDEX}'
+              key: 'net.if.in.errors[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+              trigger_prototypes:
+                - uuid: 4c893d42a1544d31a201474c9bd9c23b
+                  expression: 'min(/Avaya G430 Media Gateway by SNMP/net.if.in.errors[{#SNMPINDEX}],5m)>{$IF.ERRORS.WARN}'
+                  name: 'Interface {#IFDESCR}: High inbound error rate'
+                  priority: WARNING
+                  description: 'More than {$IF.ERRORS.WARN} errors per second for 5 minutes.'
+            - uuid: a934ca9187034f1197dea8d09fe52932
+              name: 'Interface {#IFDESCR}: Packets received'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.11.{#SNMPINDEX}'
+              key: 'net.if.in.packets[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+            - uuid: bca72f5aa15346fc8eebaa33ce606483
+              name: 'Interface {#IFDESCR}: MAC address'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.6.{#SNMPINDEX}'
+              key: 'net.if.mac[{#SNMPINDEX}]'
+              delay: 1h
+              history: 30d
+              value_type: CHAR
+              trends: '0'
+            - uuid: ccfe54e5fedf4b109f598bd424507f37
+              name: 'Interface {#IFDESCR}: Bits sent'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.16.{#SNMPINDEX}'
+              key: 'net.if.out.bytes[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              units: bps
+              description: 'RFC1213 32-bit counter (HC counters are broken on G430).'
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+                - type: MULTIPLIER
+                  parameters:
+                    - '8'
+            - uuid: 1b74cbdbe37a4e218639697fc1dc14c6
+              name: 'Interface {#IFDESCR}: Outbound packets discarded'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.19.{#SNMPINDEX}'
+              key: 'net.if.out.discards[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+              trigger_prototypes:
+                - uuid: 6ebe425f12b94560b26932ab2ca95df9
+                  expression: 'min(/Avaya G430 Media Gateway by SNMP/net.if.out.discards[{#SNMPINDEX}],5m)>{$IF.ERRORS.WARN}'
+                  name: 'Interface {#IFDESCR}: High outbound discards'
+                  priority: WARNING
+                  description: 'More than {$IF.ERRORS.WARN} discards per second for 5 minutes.'
+            - uuid: 0b086573d32b40ca882e21997d8eac67
+              name: 'Interface {#IFDESCR}: Outbound packets with errors'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.20.{#SNMPINDEX}'
+              key: 'net.if.out.errors[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+              trigger_prototypes:
+                - uuid: 0563e0f556884e908cc27080a906f4ff
+                  expression: 'min(/Avaya G430 Media Gateway by SNMP/net.if.out.errors[{#SNMPINDEX}],5m)>{$IF.ERRORS.WARN}'
+                  name: 'Interface {#IFDESCR}: High outbound error rate'
+                  priority: WARNING
+                  description: 'More than {$IF.ERRORS.WARN} errors per second for 5 minutes.'
+            - uuid: 67c0ab69717a4710a61635ddfcba970a
+              name: 'Interface {#IFDESCR}: Packets sent'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.17.{#SNMPINDEX}'
+              key: 'net.if.out.packets[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+            - uuid: ed51cf1b13e84a358f9f7de229dd5915
+              name: 'Interface {#IFDESCR}: Speed'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.31.1.1.1.15.{#SNMPINDEX}'
+              key: 'net.if.speed[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: bps
+              description: 'ifHighSpeed in Mbps, converted to bps.'
+              preprocessing:
+                - type: MULTIPLIER
+                  parameters:
+                    - '1000000'
+            - uuid: d3da4b7a1dfd445c839df755bfee4689
+              name: 'Interface {#IFDESCR}: Operational status'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.8.{#SNMPINDEX}'
+              key: 'net.if.status[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              valuemap:
+                name: 'IF operational status'
+          trigger_prototypes:
+            - uuid: dd7f7e26d3a640708be2806a4045697e
+              expression: 'min(/Avaya G430 Media Gateway by SNMP/net.if.in.bytes[{#SNMPINDEX}],5m)>(last(/Avaya G430 Media Gateway by SNMP/net.if.speed[{#SNMPINDEX}])*({$IF.UTIL.MAX}/100))'
+              name: 'Interface {#IFDESCR}: High inbound utilization'
+              opdata: 'Util: {ITEM.LASTVALUE1}'
+              priority: WARNING
+              description: 'Inbound traffic exceeds {$IF.UTIL.MAX}%% of bandwidth for 5 minutes.'
+            - uuid: d60c0c61ed904067b0ea34c1eb081406
+              expression: 'min(/Avaya G430 Media Gateway by SNMP/net.if.out.bytes[{#SNMPINDEX}],5m)>(last(/Avaya G430 Media Gateway by SNMP/net.if.speed[{#SNMPINDEX}])*({$IF.UTIL.MAX}/100))'
+              name: 'Interface {#IFDESCR}: High outbound utilization'
+              opdata: 'Util: {ITEM.LASTVALUE1}'
+              priority: WARNING
+              description: 'Outbound traffic exceeds {$IF.UTIL.MAX}%% of bandwidth for 5 minutes.'
+            - uuid: 490dae6a58d6400ab75b59959037e8f1
+              expression: '{$IFCONTROL}=1 and last(/Avaya G430 Media Gateway by SNMP/net.if.status[{#SNMPINDEX}])=2 and last(/Avaya G430 Media Gateway by SNMP/net.if.admin[{#SNMPINDEX}])=1'
+              name: 'Interface {#IFDESCR}: Link down'
+              priority: AVERAGE
+              description: 'Interface is down while administratively up.'
+          graph_prototypes:
+            - uuid: 03e38809bf2f4ab99bf0a0a6b12b5d07
+              name: 'Interface {#IFDESCR}: Network traffic'
+              ymin_type_1: FIXED
+              graph_items:
+                - drawtype: FILLED_REGION
+                  color: 1A7C11
+                  item:
+                    host: 'Avaya G430 Media Gateway by SNMP'
+                    key: 'net.if.in.bytes[{#SNMPINDEX}]'
+                - sortorder: '1'
+                  color: 2774A4
+                  item:
+                    host: 'Avaya G430 Media Gateway by SNMP'
+                    key: 'net.if.out.bytes[{#SNMPINDEX}]'
+        - uuid: 0abc975bfabc4dcb8e8aa2e01a0520c9
+          name: 'Fan Discovery'
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#SENSOR_TYPE},.1.3.6.1.2.1.99.1.1.1.1,{#SENSOR_VALUE},.1.3.6.1.2.1.99.1.1.1.4,{#SENSOR_STATUS},.1.3.6.1.2.1.99.1.1.1.5]'
+          key: sensor.fan.discovery
+          delay: 1h
+          filter:
+            evaltype: AND
+            conditions:
+              - macro: '{#SENSOR_TYPE}'
+                value: ^10$
+                formulaid: A
+              - macro: '{#SENSOR_VALUE}'
+                value: ^0$
+                operator: NOT_MATCHES_REGEX
+                formulaid: B
+          lifetime: 30d
+          description: 'Discovers fan sensors (RPM, type=10) via ENTITY-SENSOR-MIB. NOTE: slots without fans report 0 rpm - disable prototypes for empty slots if noisy.'
+          item_prototypes:
+            - uuid: 46e6d51063484ba4b0c9d5607f54cdb2
+              name: 'Sensor {#SNMPINDEX}: Entity name'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.7.{#SNMPINDEX}'
+              key: 'sensor.fan.name[{#SNMPINDEX}]'
+              delay: 1h
+              history: 30d
+              value_type: CHAR
+              trends: '0'
+              description: 'entPhysicalName of the fan entity (e.g. Base Fan 0).'
+            - uuid: 1fed5d4980d04568b3c127568c938bfb
+              name: 'Sensor {#SNMPINDEX}: Fan speed'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.99.1.1.1.4.{#SNMPINDEX}'
+              key: 'sensor.fan.speed[{#SNMPINDEX}]'
+              history: 90d
+              trends: 180d
+              units: rpm
+              description: 'entPhySensorValue in RPM (type=10).'
+              tags:
+                - tag: component
+                  value: health
+              trigger_prototypes:
+                - uuid: aa6e4d728d0b4b95b30d98fffa6333eb
+                  expression: 'last(/Avaya G430 Media Gateway by SNMP/sensor.fan.speed[{#SNMPINDEX}])=0'
+                  name: 'Sensor {#SNMPINDEX}: Fan is not spinning (0 rpm)'
+                  opdata: 'Speed: {ITEM.LASTVALUE1}'
+                  priority: AVERAGE
+                  description: 'Fan speed dropped to 0 - check cooling.'
+            - uuid: beac18c71f49412592416209e82f8799
+              name: 'Sensor {#SNMPINDEX}: Sensor status'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.99.1.1.1.5.{#SNMPINDEX}'
+              key: 'sensor.fan.status[{#SNMPINDEX}]'
+              delay: 10m
+              history: 30d
+              trends: 200d
+              valuemap:
+                name: 'Entity sensor status'
+        - uuid: 8911d4fe057e4af6b0881584aaf6c4d7
+          name: 'Temperature Discovery'
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#SENSOR_TYPE},.1.3.6.1.2.1.99.1.1.1.1,{#SENSOR_VALUE},.1.3.6.1.2.1.99.1.1.1.4,{#SENSOR_STATUS},.1.3.6.1.2.1.99.1.1.1.5]'
+          key: sensor.temp.discovery
+          delay: 1h
+          filter:
+            evaltype: AND
+            conditions:
+              - macro: '{#SENSOR_TYPE}'
+                value: ^8$
+                formulaid: A
+              - macro: '{#SENSOR_VALUE}'
+                value: ^0$
+                operator: NOT_MATCHES_REGEX
+                formulaid: B
+          lifetime: 30d
+          description: 'Discovers celsius temperature sensors via ENTITY-SENSOR-MIB (type=8). Sensor index equals entPhysicalIndex; entity name is fetched by prototype item.'
+          item_prototypes:
+            - uuid: bf123ce2da024336bc05e2d7a7f8f519
+              name: 'Sensor {#SNMPINDEX}: Entity name'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.7.{#SNMPINDEX}'
+              key: 'sensor.temp.name[{#SNMPINDEX}]'
+              delay: 1h
+              history: 30d
+              value_type: CHAR
+              trends: '0'
+              description: 'entPhysicalName of the sensor entity (e.g. Ambient Temperature Sensor).'
+            - uuid: c0b2969309e84428af9a59ee13ea3aab
+              name: 'Sensor {#SNMPINDEX}: Sensor status'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.99.1.1.1.5.{#SNMPINDEX}'
+              key: 'sensor.temp.status[{#SNMPINDEX}]'
+              delay: 10m
+              history: 30d
+              trends: 200d
+              valuemap:
+                name: 'Entity sensor status'
+            - uuid: ee4dbcc513844c1585058dd6b54860d9
+              name: 'Sensor {#SNMPINDEX}: Temperature'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.99.1.1.1.4.{#SNMPINDEX}'
+              key: 'sensor.temp.value[{#SNMPINDEX}]'
+              history: 90d
+              trends: 180d
+              units: C
+              description: 'entPhySensorValue in Celsius (type=8). Entity name see in sensor.name item.'
+              tags:
+                - tag: component
+                  value: health
+              trigger_prototypes:
+                - uuid: ae56899369bb47c88fd3ac9c30ffa586
+                  expression: 'avg(/Avaya G430 Media Gateway by SNMP/sensor.temp.value[{#SNMPINDEX}],5m)>{$TEMP_CRIT}'
+                  name: 'Sensor {#SNMPINDEX}: Temperature is above critical threshold'
+                  opdata: 'Temp: {ITEM.LASTVALUE1}'
+                  priority: HIGH
+                  description: 'Temperature above {$TEMP_CRIT}C.'
+                - uuid: b5d77409eded44e088c122332e562608
+                  expression: 'avg(/Avaya G430 Media Gateway by SNMP/sensor.temp.value[{#SNMPINDEX}],5m)>{$TEMP_WARN} and avg(/Avaya G430 Media Gateway by SNMP/sensor.temp.value[{#SNMPINDEX}],5m)<={$TEMP_CRIT}'
+                  name: 'Sensor {#SNMPINDEX}: Temperature is above warning threshold'
+                  opdata: 'Temp: {ITEM.LASTVALUE1}'
+                  priority: WARNING
+                  description: 'Temperature above {$TEMP_WARN}C.'
+          graph_prototypes:
+            - uuid: c06572c452d5419fa93bac3bd9374eed
+              name: 'Sensor {#SNMPINDEX}: Temperature'
+              ymin_type_1: FIXED
+              graph_items:
+                - drawtype: FILLED_REGION
+                  color: F63100
+                  item:
+                    host: 'Avaya G430 Media Gateway by SNMP'
+                    key: 'sensor.temp.value[{#SNMPINDEX}]'
+      macros:
+        - macro: '{$ICMP_LOSS_WARN}'
+          value: '20'
+          description: 'ICMP packet loss percent for Warning trigger.'
+        - macro: '{$ICMP_RESPONSE_TIME_WARN}'
+          value: '0.15'
+          description: 'Average ICMP response time (seconds) for Warning trigger.'
+        - macro: '{$IF.ERRORS.WARN}'
+          value: '2'
+          description: 'Threshold of interface error/discard rate (per second) for Warning triggers.'
+        - macro: '{$IF.UTIL.MAX}'
+          value: '80'
+          description: 'Percent of interface bandwidth utilization for Warning trigger.'
+        - macro: '{$IFCONTROL}'
+          value: '1'
+          description: 'Set to 0 to disable Link down triggers.'
+        - macro: '{$TEMP_CRIT}'
+          value: '45'
+          description: 'Ambient temperature (Celsius) for High trigger.'
+        - macro: '{$TEMP_WARN}'
+          value: '40'
+          description: 'Ambient temperature (Celsius) for Warning trigger.'
+      valuemaps:
+        - uuid: b6d9da3933fd49b6a4bb0c83c71ca249
+          name: Boolean
+          mappings:
+            - value: '1'
+              newvalue: 'true'
+            - value: '2'
+              newvalue: 'false'
+        - uuid: c665e07610fd4788a7f64cd5967f4aeb
+          name: 'Entity class'
+          mappings:
+            - value: '1'
+              newvalue: other
+            - value: '2'
+              newvalue: unknown
+            - value: '3'
+              newvalue: chassis
+            - value: '4'
+              newvalue: backplane
+            - value: '5'
+              newvalue: container
+            - value: '6'
+              newvalue: powerSupply
+            - value: '7'
+              newvalue: fan
+            - value: '8'
+              newvalue: sensor
+            - value: '9'
+              newvalue: module
+            - value: '10'
+              newvalue: port
+            - value: '11'
+              newvalue: stack
+        - uuid: 263828748a634ce59a8056ae2931cb00
+          name: 'Entity sensor status'
+          mappings:
+            - value: '1'
+              newvalue: ok
+            - value: '2'
+              newvalue: unavailable
+            - value: '3'
+              newvalue: nonoperational
+        - uuid: a9d9bce7246a46d892a51983562679fe
+          name: 'ICMP status'
+          mappings:
+            - value: '0'
+              newvalue: Down
+            - value: '1'
+              newvalue: Up
+        - uuid: 9b1b1dfb52504c8281ba4b73345c08d6
+          name: 'IF administrative status'
+          mappings:
+            - value: '1'
+              newvalue: up
+            - value: '2'
+              newvalue: down
+            - value: '3'
+              newvalue: testing
+        - uuid: 8379ccdb30c1437fad29065ea9483b12
+          name: 'IF operational status'
+          mappings:
+            - value: '1'
+              newvalue: up
+            - value: '2'
+              newvalue: down
+            - value: '3'
+              newvalue: testing
+            - value: '4'
+              newvalue: unknown
+            - value: '5'
+              newvalue: dormant
+            - value: '6'
+              newvalue: notPresent
+            - value: '7'
+              newvalue: lowerLayerDown
+        - uuid: 5ad377bb88124920abcb3f7854c18668
+          name: 'SNMP agent availability'
+          mappings:
+            - value: '0'
+              newvalue: 'Not available'
+            - value: '1'
+              newvalue: Available
+            - value: '2'
+              newvalue: Unknown
+  graphs:
+    - uuid: 7d45505dd07140cfb5618dab2b4433dc
+      name: 'ICMP response time'
+      ymin_type_1: FIXED
+      graph_items:
+        - drawtype: FILLED_REGION
+          color: 2774A4
+          item:
+            host: 'Avaya G430 Media Gateway by SNMP'
+            key: icmppingsec
