@@ -1,0 +1,682 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: 36bff6c29af64692839d077febfc7079
+      name: 'Templates/Network devices'
+  templates:
+    - uuid: f3d2a476d2134deb812a4199e925a04d
+      template: 'Avaya ERS 4850 GTS by SNMP'
+      name: 'Avaya ERS 4850 GTS by SNMP'
+      description: 'Custom template for Avaya (Nortel) Ethernet Routing Switch 4850GTS, sysObjectID .1.3.6.1.4.1.45.3.78.4, firmware 5.x (FASTPATH-based). Modeled after official HP Enterprise Switch by SNMP. Monitors: ICMP reachability, SNMP availability, system, RADLAN rcSys CPU (5s/1m avg), chassis serial, ifTable+ifXTable per-port traffic/errors/discards with utilization triggers, ENTITY-MIB inventory (chassis serial 15JP*), rcVlanTable VLAN names. SNMPv2c.'
+      groups:
+        - name: 'Templates/Network devices'
+      items:
+        - uuid: 647b9f5ea6b94cc497321026fa7d7c8b
+          name: 'ICMP ping'
+          type: SIMPLE
+          key: icmpping
+          history: 90d
+          trends: 200d
+          description: 'Host accessibility by ICMP ping. 0 - fails, 1 - successful.'
+          valuemap:
+            name: 'ICMP status'
+          triggers:
+            - uuid: aa2c0c568d3647e389368ad3df4f230f
+              expression: 'max(/Avaya ERS 4850 GTS by SNMP/icmpping,#3)=0'
+              name: 'Avaya ERS 4850 by SNMP: Unavailable by ICMP ping'
+              priority: HIGH
+              description: 'Last three attempts returned timeout. Check device connectivity.'
+        - uuid: 803d94af463544b6a11d945f3228a2ee
+          name: 'ICMP loss'
+          type: SIMPLE
+          key: icmppingloss
+          history: 90d
+          value_type: FLOAT
+          units: '%'
+          triggers:
+            - uuid: 55b372f358ee442c891eab587d5b0bdb
+              expression: 'min(/Avaya ERS 4850 GTS by SNMP/icmppingloss,5m)>{$ICMP_LOSS_WARN} and min(/Avaya ERS 4850 GTS by SNMP/icmppingloss,5m)<100'
+              name: 'Avaya ERS 4850 by SNMP: High ICMP ping loss'
+              opdata: 'Loss: {ITEM.LASTVALUE1}'
+              priority: WARNING
+              description: 'ICMP packet loss detected.'
+              dependencies:
+                - name: 'Avaya ERS 4850 by SNMP: Unavailable by ICMP ping'
+                  expression: 'max(/Avaya ERS 4850 GTS by SNMP/icmpping,#3)=0'
+        - uuid: d4dbf769ea8341479bf630897e35a239
+          name: 'ICMP response time'
+          type: SIMPLE
+          key: icmppingsec
+          history: 90d
+          value_type: FLOAT
+          units: s
+          triggers:
+            - uuid: 1494091afb10404598517c9d0cf660de
+              expression: 'avg(/Avaya ERS 4850 GTS by SNMP/icmppingsec,5m)>{$ICMP_RESPONSE_TIME_WARN}'
+              name: 'Avaya ERS 4850 by SNMP: High ICMP ping response time'
+              opdata: 'Time: {ITEM.LASTVALUE1}'
+              priority: WARNING
+              description: 'Average ICMP response time is too high.'
+              dependencies:
+                - name: 'Avaya ERS 4850 by SNMP: Unavailable by ICMP ping'
+                  expression: 'max(/Avaya ERS 4850 GTS by SNMP/icmpping,#3)=0'
+        - uuid: 73ae4044c96342caac058e284322362c
+          name: 'System contact'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.4.0
+          key: system.contact
+          delay: 1h
+          history: 30d
+          value_type: CHAR
+        - uuid: f6166deca1554c63bcb37d5622b41831
+          name: 'CPU utilization (1m average)'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.2272.1.34.3.2.0
+          key: system.cpu.util.1m
+          delay: 3m
+          history: 90d
+          trends: 200d
+          units: '%'
+          description: 'RADLAN rcSysCpuUtil1mAvg - CPU utilization averaged over 1 minute.'
+        - uuid: ff074ffe6c2047c7a4870d47df9e558e
+          name: 'CPU utilization (5s average)'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.2272.1.34.1.2.0
+          key: system.cpu.util.5s
+          delay: 3m
+          history: 90d
+          trends: 200d
+          units: '%'
+          description: 'RADLAN rcSysCpuUtil5sAvg - CPU utilization averaged over 5 seconds.'
+          triggers:
+            - uuid: 1562759d9e7c4434a523a5a717cd50a0
+              expression: 'avg(/Avaya ERS 4850 GTS by SNMP/system.cpu.util.5s,5m)>{$CPU.UTIL.CRIT}'
+              name: 'Avaya ERS 4850 by SNMP: High CPU utilization'
+              opdata: 'Load: {ITEM.LASTVALUE1}'
+              priority: WARNING
+              description: 'CPU utilization exceeds {$CPU.UTIL.CRIT}%% for 5 minutes.'
+        - uuid: 7f4c8956a04a4101953fb26522004434
+          name: 'System description'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.1.0
+          key: system.descr
+          delay: 1h
+          history: 30d
+          value_type: CHAR
+          description: 'Contains HW/FW/SW revision: "Ethernet Routing Switch 4850GTS HW:12 FW:5.8.0.1 SW:v5.11.1.101".'
+        - uuid: bb38f5edaf0e45c4ab2575f996d08709
+          name: 'Hardware serial number'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.2272.1.2.2.0
+          key: system.hw.serial
+          delay: 1h
+          history: 30d
+          value_type: CHAR
+          description: 'rcChasSerialNum. Empty on this unit unless configured; chassis serial also available via Entity discovery.'
+          triggers:
+            - uuid: e1f430758ca745fc824ce4d02fe2c0bb
+              expression: 'last(/Avaya ERS 4850 GTS by SNMP/system.hw.serial)<>last(/Avaya ERS 4850 GTS by SNMP/system.hw.serial,#2) and length(last(/Avaya ERS 4850 GTS by SNMP/system.hw.serial))>0'
+              name: 'Avaya ERS 4850 by SNMP: Device has been replaced'
+              priority: INFO
+              description: 'New serial number received: {ITEM.VALUE}'
+              manual_close: 'YES'
+        - uuid: 67d8d28011654e829c0cfc0a6eea8beb
+          name: 'System location'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.6.0
+          key: system.location
+          delay: 1h
+          history: 30d
+          value_type: CHAR
+        - uuid: 3be731080a6e433ebd09f07e44589f59
+          name: 'System name'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.5.0
+          key: system.name
+          delay: 15m
+          history: 30d
+          value_type: CHAR
+          triggers:
+            - uuid: 7f0d1640fef3438784a7ca95e893fb93
+              expression: 'last(/Avaya ERS 4850 GTS by SNMP/system.name)<>last(/Avaya ERS 4850 GTS by SNMP/system.name,#2) and length(last(/Avaya ERS 4850 GTS by SNMP/system.name))>0'
+              name: 'Avaya ERS 4850 by SNMP: System name has changed'
+              priority: INFO
+              description: 'New name: {ITEM.VALUE}'
+              manual_close: 'YES'
+        - uuid: eff133421e484c9898564d35526998a8
+          name: 'System object ID'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.2.0
+          key: system.objectid
+          delay: 1h
+          history: 30d
+          value_type: CHAR
+        - uuid: 0d579a34cf8347238be3007fae4cc429
+          name: 'Uptime (network)'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.3.0
+          key: system.uptime
+          delay: 3m
+          history: 30d
+          trends: 200d
+          units: s
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - '0.01'
+          triggers:
+            - uuid: 8bb49107768b480b93ce298fac8e1604
+              expression: 'last(/Avaya ERS 4850 GTS by SNMP/system.uptime)<600'
+              name: 'Avaya ERS 4850 by SNMP: Device has been restarted (uptime < 10 min)'
+              opdata: 'Uptime: {ITEM.LASTVALUE1}'
+              priority: WARNING
+              description: 'sysUpTime is less than 10 minutes.'
+              manual_close: 'YES'
+        - uuid: f216bc8670704b21b925d7d27cdb0ec2
+          name: 'SNMP agent availability'
+          type: INTERNAL
+          key: 'zabbix[host,snmp,available]'
+          history: 90d
+          trends: 200d
+          description: 'Availability of SNMP checks on the host.'
+          valuemap:
+            name: 'SNMP agent availability'
+          triggers:
+            - uuid: b93346a733d04d16b404f9e0e4d7770a
+              expression: 'max(/Avaya ERS 4850 GTS by SNMP/zabbix[host,snmp,available],10m)=2'
+              name: 'Avaya ERS 4850 by SNMP: No SNMP data collection'
+              priority: WARNING
+              description: 'SNMP check errors for 10 minutes. Check interface, community and ACL on the device.'
+              manual_close: 'YES'
+              dependencies:
+                - name: 'Avaya ERS 4850 by SNMP: Unavailable by ICMP ping'
+                  expression: 'max(/Avaya ERS 4850 GTS by SNMP/icmpping,#3)=0'
+      discovery_rules:
+        - uuid: 9f2410294f8d4418b14bfc7e8f573f15
+          name: 'Entity Discovery'
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#ENT_CLASS},.1.3.6.1.2.1.47.1.1.1.1.5,{#ENT_NAME},.1.3.6.1.2.1.47.1.1.1.1.7]'
+          key: entity.physical.discovery
+          delay: 1h
+          lifetime: 30d
+          description: 'Discovers ENTITY-MIB entities: chassis (serial!) and 50 ports.'
+          item_prototypes:
+            - uuid: 7e862fe8fdc949fda776d8ab7c4217a2
+              name: '{#ENT_NAME}: Class'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.5.{#SNMPINDEX}'
+              key: 'entity.class[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              trends: 200d
+              valuemap:
+                name: 'Entity class'
+            - uuid: 6595914340a14c0fbb205d81db2c7440
+              name: '{#ENT_NAME}: Field replaceable'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.16.{#SNMPINDEX}'
+              key: 'entity.fru[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              trends: 200d
+              valuemap:
+                name: Boolean
+            - uuid: 0c29f7a57ccb41e5a52857ba8c625c6e
+              name: '{#ENT_NAME}: Hardware version(revision)'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.8.{#SNMPINDEX}'
+              key: 'entity.hwrev[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              value_type: CHAR
+              description: entPhysicalHardwareRev.
+            - uuid: 031b4769ea954ea7bb9b8e263fba6aac
+              name: '{#ENT_NAME}: Manufacturer'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.12.{#SNMPINDEX}'
+              key: 'entity.mfg[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              value_type: CHAR
+            - uuid: a39787bf6b274d46b3f905eb23ce0780
+              name: '{#ENT_NAME}: Hardware model name'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.2.{#SNMPINDEX}'
+              key: 'entity.model[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              value_type: CHAR
+              description: entPhysicalDescr.
+            - uuid: 16595cf0215849afbe792a97e191e65c
+              name: '{#ENT_NAME}: Hardware serial number'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.11.{#SNMPINDEX}'
+              key: 'entity.serial[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              value_type: CHAR
+              description: 'entPhysicalSerialNum; filled for chassis.'
+        - uuid: 5ced5fde1a434505b059dad95e10facf
+          name: 'Network interfaces discovery'
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#IFOPERSTATUS},.1.3.6.1.2.1.2.2.1.8,{#IFADMINSTATUS},.1.3.6.1.2.1.2.2.1.7,{#IFALIAS},.1.3.6.1.2.1.31.1.1.1.18,{#IFNAME},.1.3.6.1.2.1.31.1.1.1.1,{#IFDESCR},.1.3.6.1.2.1.2.2.1.2,{#IFTYPE},.1.3.6.1.2.1.2.2.1.3]'
+          key: net.if.discovery
+          delay: 1h
+          filter:
+            evaltype: AND
+            conditions:
+              - macro: '{#IFADMINSTATUS}'
+                value: '{$NET.IF.IFADMINSTATUS.MATCHES}'
+              - macro: '{#IFADMINSTATUS}'
+                value: '{$NET.IF.IFADMINSTATUS.NOT_MATCHES}'
+                operator: NOT_MATCHES_REGEX
+              - macro: '{#IFNAME}'
+                value: '{$NET.IF.IFNAME.MATCHES}'
+              - macro: '{#IFNAME}'
+                value: '{$NET.IF.IFNAME.NOT_MATCHES}'
+                operator: NOT_MATCHES_REGEX
+              - macro: '{#IFTYPE}'
+                value: ^6$
+          lifetime: 30d
+          description: 'Discovers physical ports (ifType=6, 48 x 10/100/1000 + SFP combo). Counters from RFC1213 ifTable and 64-bit ifXTable.'
+          item_prototypes:
+            - uuid: 348b74c1ffa648af82563c0d4a7428a6
+              name: 'Interface {#IFNAME}({#IFALIAS}): Administrative status'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.7.{#SNMPINDEX}'
+              key: 'net.if.admin[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              valuemap:
+                name: 'IF administrative status'
+            - uuid: 62c9dff0b3fc4296bb36096a1c782967
+              name: 'Interface {#IFNAME}({#IFALIAS}): Bits received'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.31.1.1.1.6.{#SNMPINDEX}'
+              key: 'net.if.in.bytes[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              units: bps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                - type: MULTIPLIER
+                  parameters:
+                    - '8'
+            - uuid: b2692083c803432bbe08277a7f8fd9d9
+              name: 'Interface {#IFNAME}({#IFALIAS}): Inbound packets discarded'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.13.{#SNMPINDEX}'
+              key: 'net.if.in.discards[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+              trigger_prototypes:
+                - uuid: 7c5b7132262746b8b0d89222c694fb21
+                  expression: 'min(/Avaya ERS 4850 GTS by SNMP/net.if.in.discards[{#SNMPINDEX}],5m)>{$IF.ERRORS.WARN}'
+                  name: 'Interface {#IFNAME}({#IFALIAS}): High inbound discards'
+                  status: DISABLED
+                  priority: WARNING
+                  description: 'More than {$IF.ERRORS.WARN} discards per second for 5 minutes.'
+            - uuid: 9eb79c1a7ac54c82a3e80829a44298f0
+              name: 'Interface {#IFNAME}({#IFALIAS}): Inbound packets with errors'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.14.{#SNMPINDEX}'
+              key: 'net.if.in.errors[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+              trigger_prototypes:
+                - uuid: aa62a81e8fb04ca3898a8340e5b13202
+                  expression: 'min(/Avaya ERS 4850 GTS by SNMP/net.if.in.errors[{#SNMPINDEX}],5m)>{$IF.ERRORS.WARN}'
+                  name: 'Interface {#IFNAME}({#IFALIAS}): High inbound error rate'
+                  status: DISABLED
+                  priority: WARNING
+                  description: 'More than {$IF.ERRORS.WARN} errors per second for 5 minutes.'
+            - uuid: 08b79d074bcb44b3bf6e5df8a241a721
+              name: 'Interface {#IFNAME}({#IFALIAS}): Packets received'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.11.{#SNMPINDEX}'
+              key: 'net.if.in.packets[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+            - uuid: 7d23d6891949469aa0400326f20485f3
+              name: 'Interface {#IFNAME}({#IFALIAS}): MAC address'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.6.{#SNMPINDEX}'
+              key: 'net.if.mac[{#SNMPINDEX}]'
+              delay: 1h
+              history: 30d
+              value_type: CHAR
+            - uuid: 7459218b55f542a89e383e8e41331894
+              name: 'Interface {#IFNAME}({#IFALIAS}): Bits sent'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.31.1.1.1.10.{#SNMPINDEX}'
+              key: 'net.if.out.bytes[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              units: bps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                - type: MULTIPLIER
+                  parameters:
+                    - '8'
+            - uuid: 48d578afb0754676b95884997068dd84
+              name: 'Interface {#IFNAME}({#IFALIAS}): Outbound packets discarded'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.19.{#SNMPINDEX}'
+              key: 'net.if.out.discards[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+              trigger_prototypes:
+                - uuid: 95065f593353488d9e543946447e9beb
+                  expression: 'min(/Avaya ERS 4850 GTS by SNMP/net.if.out.discards[{#SNMPINDEX}],5m)>{$IF.ERRORS.WARN}'
+                  name: 'Interface {#IFNAME}({#IFALIAS}): High outbound discards'
+                  status: DISABLED
+                  priority: WARNING
+                  description: 'More than {$IF.ERRORS.WARN} discards per second for 5 minutes.'
+            - uuid: b18d355fa431484cae947e7f3a18e4f1
+              name: 'Interface {#IFNAME}({#IFALIAS}): Outbound packets with errors'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.20.{#SNMPINDEX}'
+              key: 'net.if.out.errors[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+              trigger_prototypes:
+                - uuid: dac68de5570e4529a34c81d38fea42cd
+                  expression: 'min(/Avaya ERS 4850 GTS by SNMP/net.if.out.errors[{#SNMPINDEX}],5m)>{$IF.ERRORS.WARN}'
+                  name: 'Interface {#IFNAME}({#IFALIAS}): High outbound error rate'
+                  status: DISABLED
+                  priority: WARNING
+                  description: 'More than {$IF.ERRORS.WARN} errors per second for 5 minutes.'
+            - uuid: a07970e1e95d47c5b7cb9c7529d14491
+              name: 'Interface {#IFNAME}({#IFALIAS}): Packets sent'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.17.{#SNMPINDEX}'
+              key: 'net.if.out.packets[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+            - uuid: d514224ef810410db8591d6343516fb7
+              name: 'Interface {#IFNAME}({#IFALIAS}): Speed'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.31.1.1.1.15.{#SNMPINDEX}'
+              key: 'net.if.speed[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: bps
+              description: 'ifHighSpeed in Mbps, converted to bps.'
+              preprocessing:
+                - type: MULTIPLIER
+                  parameters:
+                    - '1000000'
+            - uuid: 0260a5aed2244feea4751857c186b45f
+              name: 'Interface {#IFNAME}({#IFALIAS}): Operational status'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.8.{#SNMPINDEX}'
+              key: 'net.if.status[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              valuemap:
+                name: 'IF operational status'
+          trigger_prototypes:
+            - uuid: 8c97b3b6cc7746a49c3880a344fc0d4b
+              expression: 'min(/Avaya ERS 4850 GTS by SNMP/net.if.in.bytes[{#SNMPINDEX}],5m)>(last(/Avaya ERS 4850 GTS by SNMP/net.if.speed[{#SNMPINDEX}])*({$IF.UTIL.MAX}/100))'
+              name: 'Interface {#IFNAME}({#IFALIAS}): High inbound utilization'
+              opdata: 'Util: {ITEM.LASTVALUE1}'
+              status: DISABLED
+              priority: WARNING
+              description: 'Inbound traffic exceeds {$IF.UTIL.MAX}%% of bandwidth for 5 minutes.'
+            - uuid: 5fb963fa2eb5479b9e90db2e597d3ff2
+              expression: 'min(/Avaya ERS 4850 GTS by SNMP/net.if.out.bytes[{#SNMPINDEX}],5m)>(last(/Avaya ERS 4850 GTS by SNMP/net.if.speed[{#SNMPINDEX}])*({$IF.UTIL.MAX}/100))'
+              name: 'Interface {#IFNAME}({#IFALIAS}): High outbound utilization'
+              opdata: 'Util: {ITEM.LASTVALUE1}'
+              status: DISABLED
+              priority: WARNING
+              description: 'Outbound traffic exceeds {$IF.UTIL.MAX}%% of bandwidth for 5 minutes.'
+            - uuid: f0b0bcdb8a3142e3932fefa6a4903b94
+              expression: '{$IFCONTROL}=1 and last(/Avaya ERS 4850 GTS by SNMP/net.if.status[{#SNMPINDEX}])=2 and last(/Avaya ERS 4850 GTS by SNMP/net.if.admin[{#SNMPINDEX}])=1'
+              name: 'Interface {#IFNAME}({#IFALIAS}): Link down'
+              status: DISABLED
+              priority: AVERAGE
+              description: 'Interface is down while administratively up.'
+          graph_prototypes:
+            - uuid: 68051c9b751242dbbd2e07e6bed63f08
+              name: 'Interface {#IFNAME}({#IFALIAS}): Network traffic'
+              ymin_type_1: FIXED
+              graph_items:
+                - drawtype: FILLED_REGION
+                  color: 1A7C11
+                  item:
+                    host: 'Avaya ERS 4850 GTS by SNMP'
+                    key: 'net.if.in.bytes[{#SNMPINDEX}]'
+                - sortorder: '1'
+                  color: 2774A4
+                  item:
+                    host: 'Avaya ERS 4850 GTS by SNMP'
+                    key: 'net.if.out.bytes[{#SNMPINDEX}]'
+        - uuid: 3ebd395c8776476ba43a2213dccedd1b
+          name: 'VLAN Discovery'
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#VLANNAME},.1.3.6.1.4.1.2272.1.3.2.1.2]'
+          key: vlan.discovery
+          delay: 1h
+          lifetime: 30d
+          description: 'Discovers VLANs from Nortel rcVlanTable ({#SNMPINDEX} is VLAN ID).'
+          item_prototypes:
+            - uuid: b8f5f93d94fb40b0aadfb9ac88734df0
+              name: 'VLAN {#SNMPINDEX}: Name'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.4.1.2272.1.3.2.1.2.{#SNMPINDEX}'
+              key: 'vlan.name[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              value_type: CHAR
+              tags:
+                - tag: component
+                  value: network
+      macros:
+        - macro: '{$CPU.UTIL.CRIT}'
+          value: '90'
+          description: 'CPU utilization percent for High trigger.'
+        - macro: '{$ICMP_LOSS_WARN}'
+          value: '20'
+          description: 'ICMP packet loss percent for Warning trigger.'
+        - macro: '{$ICMP_RESPONSE_TIME_WARN}'
+          value: '0.15'
+          description: 'Average ICMP response time (seconds) for Warning trigger.'
+        - macro: '{$IF.ERRORS.WARN}'
+          value: '2'
+          description: 'Threshold of interface error/discard rate (per second) for Warning triggers.'
+        - macro: '{$IF.UTIL.MAX}'
+          value: '80'
+          description: 'Percent of interface bandwidth utilization for Warning trigger.'
+        - macro: '{$IFCONTROL}'
+          value: '1'
+          description: 'Set to 0 to disable Link down triggers.'
+        - macro: '{$NET.IF.IFADMINSTATUS.MATCHES}'
+          value: '^.*'
+          description: 'Filter of discovered interfaces by admin status (regex).'
+        - macro: '{$NET.IF.IFADMINSTATUS.NOT_MATCHES}'
+          value: ^2$
+          description: 'Ignore administratively down interfaces.'
+        - macro: '{$NET.IF.IFNAME.MATCHES}'
+          value: '^.*$'
+          description: 'Filter of discovered interfaces by name (regex).'
+        - macro: '{$NET.IF.IFNAME.NOT_MATCHES}'
+          value: CHANGE_IF_NEEDED
+          description: 'Exclude interfaces by name (regex), e.g. VLAN sub-interfaces.'
+      dashboards:
+        - uuid: 34609d92d7724eb7842b24e1091eab05
+          name: 'Avaya ERS 4850'
+          pages:
+            - widgets:
+                - type: graph
+                  name: 'ICMP response time'
+                  width: '35'
+                  height: '6'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: 'Avaya ERS 4850 GTS by SNMP'
+                        name: 'ICMP response time'
+                    - type: STRING
+                      name: reference
+                      value: 7JN30
+                - type: graphprototype
+                  name: 'Interface traffic'
+                  'y': '6'
+                  width: '72'
+                  height: '28'
+                  fields:
+                    - type: INTEGER
+                      name: columns
+                      value: '5'
+                    - type: GRAPH_PROTOTYPE
+                      name: graphid.0
+                      value:
+                        host: 'Avaya ERS 4850 GTS by SNMP'
+                        name: 'Interface {#IFNAME}({#IFALIAS}): Network traffic'
+                    - type: STRING
+                      name: reference
+                      value: MFXN4
+                    - type: INTEGER
+                      name: rows
+                      value: '7'
+                - type: graph
+                  name: 'CPU utilization'
+                  x: '35'
+                  width: '37'
+                  height: '6'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: 'Avaya ERS 4850 GTS by SNMP'
+                        name: 'CPU utilization'
+                    - type: STRING
+                      name: reference
+                      value: DXDNZ
+      valuemaps:
+        - uuid: 71b2273e77d54d1d90eb1a8f50eab5de
+          name: Boolean
+          mappings:
+            - value: '1'
+              newvalue: 'true'
+            - value: '2'
+              newvalue: 'false'
+        - uuid: 105ef09fa8c240a6bef657e21135a63e
+          name: 'Entity class'
+          mappings:
+            - value: '1'
+              newvalue: other
+            - value: '2'
+              newvalue: unknown
+            - value: '3'
+              newvalue: chassis
+            - value: '4'
+              newvalue: backplane
+            - value: '5'
+              newvalue: container
+            - value: '6'
+              newvalue: powerSupply
+            - value: '7'
+              newvalue: fan
+            - value: '8'
+              newvalue: sensor
+            - value: '9'
+              newvalue: module
+            - value: '10'
+              newvalue: port
+            - value: '11'
+              newvalue: stack
+        - uuid: 79a9c33fd1f84195b9b6fc042cef2ed9
+          name: 'ICMP status'
+          mappings:
+            - value: '0'
+              newvalue: Down
+            - value: '1'
+              newvalue: Up
+        - uuid: 3e2a45e4610e45e3a775c9c72d613df6
+          name: 'IF administrative status'
+          mappings:
+            - value: '1'
+              newvalue: up
+            - value: '2'
+              newvalue: down
+            - value: '3'
+              newvalue: testing
+        - uuid: 2ae4105300d44a2cb430423e36f792e9
+          name: 'IF operational status'
+          mappings:
+            - value: '1'
+              newvalue: up
+            - value: '2'
+              newvalue: down
+            - value: '3'
+              newvalue: testing
+            - value: '4'
+              newvalue: unknown
+            - value: '5'
+              newvalue: dormant
+            - value: '6'
+              newvalue: notPresent
+            - value: '7'
+              newvalue: lowerLayerDown
+        - uuid: d4314ff9dcad4a4ca0e3c713ae04ee99
+          name: 'SNMP agent availability'
+          mappings:
+            - value: '0'
+              newvalue: 'Not available'
+            - value: '1'
+              newvalue: Available
+            - value: '2'
+              newvalue: Unknown
+  graphs:
+    - uuid: 8427537dc43e468d9525f76270b63241
+      name: 'CPU utilization'
+      ymin_type_1: FIXED
+      graph_items:
+        - drawtype: FILLED_REGION
+          color: 1A7C11
+          item:
+            host: 'Avaya ERS 4850 GTS by SNMP'
+            key: system.cpu.util.5s
+        - sortorder: '1'
+          color: 2774A4
+          item:
+            host: 'Avaya ERS 4850 GTS by SNMP'
+            key: system.cpu.util.1m
+    - uuid: 7f38b036ce874cb0af88b9316d3a9ff5
+      name: 'ICMP response time'
+      ymin_type_1: FIXED
+      graph_items:
+        - drawtype: FILLED_REGION
+          color: 2774A4
+          item:
+            host: 'Avaya ERS 4850 GTS by SNMP'
+            key: icmppingsec

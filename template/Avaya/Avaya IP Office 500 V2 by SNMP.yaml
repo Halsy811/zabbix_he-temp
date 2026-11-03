@@ -1,0 +1,1153 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: 36bff6c29af64692839d077febfc7079
+      name: 'Templates/Network devices'
+    - uuid: 1d12408342854fd5a4436dd6d5d1bd4a
+      name: Templates/Telephony
+  templates:
+    - uuid: 5ced3b86065c48948e12be91e2d5f5f1
+      template: 'Avaya IP Office 500 V2 by SNMP'
+      name: 'Avaya IP Office 500 V2 by SNMP'
+      description: 'Custom template for Avaya IP Office 500 V2 PBX (sysObjectID .1.3.6.1.4.1.6889.1.2.1.10.1). Monitors: system, ICMP reachability, SNMP availability, ifTable interfaces, IP/ICMP/TCP/UDP/SNMP counters, ENTITY-MIB hardware inventory and Avaya IP Office extensions (phones). SNMPv1: interface bulk MUST be 0.'
+      groups:
+        - name: 'Templates/Network devices'
+        - name: Templates/Telephony
+      items:
+        - uuid: d0035754c5694328bc3e0c3046060d1a
+          name: 'ICMP: Dest unreachable received'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.5.3.0
+          key: icmp.in.dest.unreach
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          tags:
+            - tag: component
+              value: network
+        - uuid: b291bd3c129042c4918b708f240627a1
+          name: 'ICMP: Errors received'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.5.2.0
+          key: icmp.in.errors
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          tags:
+            - tag: component
+              value: network
+        - uuid: fd9722a5290b42298c5d6ed3d247aca7
+          name: 'ICMP: Messages received'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.5.1.0
+          key: icmp.in.msgs
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          tags:
+            - tag: component
+              value: network
+        - uuid: db916048db37420ba3576c7a6606eb24
+          name: 'ICMP: Dest unreachable sent'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.5.16.0
+          key: icmp.out.dest.unreach
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          tags:
+            - tag: component
+              value: network
+        - uuid: 3411b537c59e4315be4f194451581335
+          name: 'ICMP: Errors sent'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.5.15.0
+          key: icmp.out.errors
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          tags:
+            - tag: component
+              value: network
+        - uuid: 2120ee5a5338446ab775f81a62084cc0
+          name: 'ICMP: Messages sent'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.5.14.0
+          key: icmp.out.msgs
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          tags:
+            - tag: component
+              value: network
+        - uuid: 7604a381a16d48cab35eec3e8a6bfd36
+          name: 'ICMP ping'
+          type: SIMPLE
+          key: icmpping
+          history: 90d
+          trends: 200d
+          description: 'Host accessibility by ICMP ping. 0 - fails, 1 - successful.'
+          valuemap:
+            name: 'ICMP status'
+          triggers:
+            - uuid: 1419e12e4bc3478bac9654eca63fbef9
+              expression: 'max(/Avaya IP Office 500 V2 by SNMP/icmpping,#3)=0'
+              name: 'Avaya IP Office 500 V2 by SNMP: Unavailable by ICMP ping'
+              priority: HIGH
+              description: 'Last three attempts returned timeout. Check device connectivity.'
+        - uuid: 6357bf153c634718a9d9228bec2f026b
+          name: 'ICMP loss'
+          type: SIMPLE
+          key: icmppingloss
+          history: 90d
+          value_type: FLOAT
+          units: '%'
+          triggers:
+            - uuid: 12d4c0759e87494297b6e73cc88f75c3
+              expression: 'min(/Avaya IP Office 500 V2 by SNMP/icmppingloss,5m)>{$ICMP_LOSS_WARN} and min(/Avaya IP Office 500 V2 by SNMP/icmppingloss,5m)<100'
+              name: 'Avaya IP Office 500 V2 by SNMP: High ICMP ping loss'
+              opdata: 'Loss: {ITEM.LASTVALUE1}'
+              priority: WARNING
+              description: 'ICMP packet loss detected.'
+              dependencies:
+                - name: 'Avaya IP Office 500 V2 by SNMP: Unavailable by ICMP ping'
+                  expression: 'max(/Avaya IP Office 500 V2 by SNMP/icmpping,#3)=0'
+        - uuid: d1ebba13b413445195763aa5bbdd9531
+          name: 'ICMP response time'
+          type: SIMPLE
+          key: icmppingsec
+          history: 90d
+          value_type: FLOAT
+          units: s
+          triggers:
+            - uuid: 9e90904e3894429dac951dbbdde67246
+              expression: 'avg(/Avaya IP Office 500 V2 by SNMP/icmppingsec,5m)>{$ICMP_RESPONSE_TIME_WARN}'
+              name: 'Avaya IP Office 500 V2 by SNMP: High ICMP ping response time'
+              opdata: 'Time: {ITEM.LASTVALUE1}'
+              priority: WARNING
+              description: 'Average ICMP response time is too high.'
+              dependencies:
+                - name: 'Avaya IP Office 500 V2 by SNMP: Unavailable by ICMP ping'
+                  expression: 'max(/Avaya IP Office 500 V2 by SNMP/icmpping,#3)=0'
+        - uuid: a5e60e8e6f0849978eb198a763f03805
+          name: 'IP: Forwarded datagrams'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.4.6.0
+          key: ip.forwarded
+          delay: 3m
+          history: 90d
+          trends: 200d
+          description: 'Datagrams this device forwarded.'
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          tags:
+            - tag: component
+              value: network
+        - uuid: 4a49cf089784468ba39572172d2a52a9
+          name: 'IP: Incoming address errors'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.4.5.0
+          key: ip.in.addr.errors
+          delay: 3m
+          history: 90d
+          trends: 200d
+          description: 'Datagrams discarded due to invalid destination address.'
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          tags:
+            - tag: component
+              value: network
+        - uuid: a1d1ef6401754a2798bd04d5f1157da3
+          name: 'IP: Incoming discarded'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.4.8.0
+          key: ip.in.discards
+          delay: 3m
+          history: 90d
+          trends: 200d
+          description: 'Datagrams discarded (e.g. buffer limits).'
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          tags:
+            - tag: component
+              value: network
+        - uuid: 57ea90903a254cfe8789bf2b04ab9090
+          name: 'IP: Incoming header errors'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.4.4.0
+          key: ip.in.hdr.errors
+          delay: 3m
+          history: 90d
+          trends: 200d
+          description: 'Datagrams discarded due to header errors.'
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          tags:
+            - tag: component
+              value: network
+        - uuid: 132d631daaed453b9f27b5465d121d47
+          name: 'IP: Incoming requests'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.4.3.0
+          key: ip.in.receives
+          delay: 3m
+          history: 90d
+          trends: 200d
+          description: 'Total datagrams received from interfaces.'
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          tags:
+            - tag: component
+              value: network
+        - uuid: 931be418fce149008c8a2c6bac229b30
+          name: 'IP: Outgoing discarded'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.4.11.0
+          key: ip.out.discards
+          delay: 3m
+          history: 90d
+          trends: 200d
+          description: 'Outgoing datagrams discarded.'
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          tags:
+            - tag: component
+              value: network
+        - uuid: 2ab3a69c1a0a42f1a7bd1f3391073858
+          name: 'IP: Outgoing requests'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.4.10.0
+          key: ip.out.requests
+          delay: 3m
+          history: 90d
+          trends: 200d
+          description: 'Datagrams supplied for transmission.'
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          tags:
+            - tag: component
+              value: network
+        - uuid: d722ddd492c64161b2504d4b957d1782
+          name: 'IP: Routing discards'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.4.23.0
+          key: ip.routing.discards
+          delay: 3m
+          history: 90d
+          trends: 200d
+          description: 'Valid route entries discarded.'
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          tags:
+            - tag: component
+              value: network
+        - uuid: d4907ffa4eeb46fbba7dc4c1467b3f72
+          name: 'IPO: Extensions total'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.6889.2.2.1.1.1.1.1.1.0
+          key: ipo.extensions.total
+          delay: 15m
+          history: 90d
+          trends: 200d
+          description: 'Number of extensions (lines) in Avaya IP Office table.'
+          tags:
+            - tag: component
+              value: telephony
+        - uuid: 3585e377594d4774a2e512cd3966bc9a
+          name: 'SNMP: ASN.1 parse errors'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.11.6.0
+          key: snmp.in.asn.parse.errors
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+        - uuid: a6d212d9bb3f402ca08a72e14e095d88
+          name: 'SNMP: Bad community names'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.11.4.0
+          key: snmp.in.bad.community.names
+          delay: 3m
+          history: 90d
+          trends: 200d
+          description: 'Requests with unknown SNMP community received.'
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          triggers:
+            - uuid: 142322df4da342d6915500fe8b20b436
+              expression: 'min(/Avaya IP Office 500 V2 by SNMP/snmp.in.bad.community.names,5m)>0'
+              name: 'Avaya IP Office 500 V2 by SNMP: SNMP requests with unknown community name'
+              priority: WARNING
+              description: 'Someone polls this device with a wrong community string (possible scan).'
+              manual_close: 'YES'
+        - uuid: 9f5625bec5484f8e8cbcc325830bdbd3
+          name: 'SNMP: Bad community uses'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.11.5.0
+          key: snmp.in.bad.community.uses
+          delay: 3m
+          history: 90d
+          trends: 200d
+          description: 'Requests with wrong community usage (operation not allowed) received.'
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          triggers:
+            - uuid: 04f393929431403b9d5bc170968868b7
+              expression: 'min(/Avaya IP Office 500 V2 by SNMP/snmp.in.bad.community.uses,5m)>0'
+              name: 'Avaya IP Office 500 V2 by SNMP: SNMP requests with forbidden operation for community'
+              priority: WARNING
+              description: 'Requests with valid community but unauthorized operation.'
+              manual_close: 'YES'
+        - uuid: 395c8cc75dd0414caa0b16e7ed646b76
+          name: 'SNMP: Packets received'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.11.1.0
+          key: snmp.in.packets
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+        - uuid: bfce4e7964704373a4fb25a909fc1651
+          name: 'SNMP: Packets sent'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.11.2.0
+          key: snmp.out.packets
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+        - uuid: a38adc1ac32b4869b47be842525b2496
+          name: 'System contact'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.4.0
+          key: system.contact
+          delay: 1h
+          history: 30d
+          value_type: CHAR
+          trends: '0'
+        - uuid: 3a2116c97a8c44419351987f9e2619c0
+          name: 'System description'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.1.0
+          key: system.descr
+          delay: 1h
+          history: 30d
+          value_type: CHAR
+          trends: '0'
+        - uuid: b41b01c35ce94ca8ac37fe4fec0a4f34
+          name: 'System location'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.6.0
+          key: system.location
+          delay: 1h
+          history: 30d
+          value_type: CHAR
+          trends: '0'
+        - uuid: 757234b004fa4fdf9777f717a7aef116
+          name: 'System name'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.5.0
+          key: system.name
+          delay: 15m
+          history: 30d
+          value_type: CHAR
+          trends: '0'
+        - uuid: 43b7c7d4eb5944ca955f34a90903c9de
+          name: Uptime
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.3.0
+          key: system.uptime
+          delay: 3m
+          history: 30d
+          trends: 200d
+          units: s
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - '0.01'
+          triggers:
+            - uuid: 83b501c2378446469708c93fe4abf735
+              expression: 'last(/Avaya IP Office 500 V2 by SNMP/system.uptime)<600'
+              name: 'Avaya IP Office 500 V2 by SNMP: Device has been restarted (uptime < 10 min)'
+              opdata: 'Uptime: {ITEM.LASTVALUE1}'
+              priority: WARNING
+              description: 'sysUpTime is less than 10 minutes.'
+              manual_close: 'YES'
+        - uuid: 48cf672a66224f72a87b2488c62af2c3
+          name: 'TCP: Active opens'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.6.5.0
+          key: tcp.active.opens
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+        - uuid: dbfce440c6374420a91e80f6748ccc10
+          name: 'TCP: Failed connection attempts'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.6.7.0
+          key: tcp.attempt.fails
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+        - uuid: 7ee0a5c026854c5988025308e960e725
+          name: 'TCP: Connections established'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.6.9.0
+          key: tcp.curr.estab
+          delay: 3m
+          history: 90d
+          trends: 200d
+          description: 'Current established TCP connections (gauge).'
+        - uuid: 270eb4562d99474494a7b1a237b037a8
+          name: 'TCP: Established resets'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.6.8.0
+          key: tcp.estab.resets
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+        - uuid: ade54659ef684063a62027469a28ed2f
+          name: 'TCP: Segments with errors'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.6.14.0
+          key: tcp.in.errs
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+        - uuid: e16ce6ccc624400c9b37d44197d39314
+          name: 'TCP: Segments received'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.6.10.0
+          key: tcp.in.segs
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+        - uuid: d344bffa35c84bb8a5de530026ff5e46
+          name: 'TCP: Segments sent'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.6.11.0
+          key: tcp.out.segs
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+        - uuid: e1602a3c1fd4420a8f1213294e563c29
+          name: 'TCP: Passive opens'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.6.6.0
+          key: tcp.passive.opens
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+        - uuid: 594e1a3d93964a9d9879cd2769e4a3a8
+          name: 'TCP: Retransmitted segments'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.6.12.0
+          key: tcp.retrans.segs
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+        - uuid: 062a1b10455247a6927e1be8542e1ddc
+          name: 'UDP: Datagrams received'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.7.1.0
+          key: udp.in.datagrams
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+        - uuid: 5795f3a36be14eb2bb82df9ee8bda5f3
+          name: 'UDP: Errors received'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.7.3.0
+          key: udp.in.errors
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+        - uuid: a0be8e508c114dbfac85af50c993e9e6
+          name: 'UDP: No port received'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.7.2.0
+          key: udp.no.ports
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+        - uuid: 15ae95eec65b4f1e8a474fb1d8156202
+          name: 'UDP: Datagrams sent'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.7.4.0
+          key: udp.out.datagrams
+          delay: 3m
+          history: 90d
+          trends: 200d
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+        - uuid: c723a43e7727442c97879c6c43a8586e
+          name: 'SNMP agent availability'
+          type: INTERNAL
+          key: 'zabbix[host,snmp,available]'
+          history: 90d
+          trends: 200d
+          description: 'Availability of SNMP checks on the host.'
+          valuemap:
+            name: 'SNMP agent availability'
+          triggers:
+            - uuid: c4c7015cceeb43cebdcb804706dd28f6
+              expression: 'max(/Avaya IP Office 500 V2 by SNMP/zabbix[host,snmp,available],10m)=2'
+              name: 'Avaya IP Office 500 V2 by SNMP: Unavailable by SNMP agent'
+              priority: WARNING
+              description: 'SNMP check errors for 10 minutes. Check interface, community and ACL on the device.'
+              manual_close: 'YES'
+              dependencies:
+                - name: 'Avaya IP Office 500 V2 by SNMP: Unavailable by ICMP ping'
+                  expression: 'max(/Avaya IP Office 500 V2 by SNMP/icmpping,#3)=0'
+      discovery_rules:
+        - uuid: b59ede58eb584984968956e927f8760d
+          name: 'Physical entities discovery (ENTITY-MIB)'
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#ENTDESCR},.1.3.6.1.2.1.47.1.1.1.1.2,{#ENTCLASS},.1.3.6.1.2.1.47.1.1.1.1.5,{#ENTNAME},.1.3.6.1.2.1.47.1.1.1.1.7,{#ENTFRU},.1.3.6.1.2.1.47.1.1.1.1.16]'
+          key: entity.physical.discovery
+          delay: 1h
+          lifetime: 30d
+          description: 'Discovers chassis/slots/cards/ports via ENTITY-MIB entPhysicalTable (55 entities on IP500V2).'
+          item_prototypes:
+            - uuid: c2076d6f673b4243810e658eb64b1e77
+              name: 'Entity {#SNMPINDEX}: Class'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.5.{#SNMPINDEX}'
+              key: 'entity.class[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              trends: 200d
+              valuemap:
+                name: 'Entity class'
+            - uuid: b745c59af10048d8b3ce8714b54f24e1
+              name: 'Entity {#SNMPINDEX}: Description'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.2.{#SNMPINDEX}'
+              key: 'entity.descr[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              value_type: CHAR
+              trends: '0'
+            - uuid: 7e1122f3ba5c4b1bb42583d19ad6ffca
+              name: 'Entity {#SNMPINDEX}: Field replaceable'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.16.{#SNMPINDEX}'
+              key: 'entity.fru[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              trends: 200d
+              valuemap:
+                name: Boolean
+            - uuid: c421bc3d9ea94f3189fca396d16a9937
+              name: 'Entity {#SNMPINDEX}: Manufacturer'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.12.{#SNMPINDEX}'
+              key: 'entity.mfg[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              value_type: CHAR
+              trends: '0'
+            - uuid: c49ec19c775e4d6195c867788e23df89
+              name: 'Entity {#SNMPINDEX}: Name'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.7.{#SNMPINDEX}'
+              key: 'entity.name[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              value_type: CHAR
+              trends: '0'
+            - uuid: 5040f124375e4059a71b5057a11da541
+              name: 'Entity {#SNMPINDEX}: Serial number'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.47.1.1.1.1.11.{#SNMPINDEX}'
+              key: 'entity.serial[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              value_type: CHAR
+              trends: '0'
+        - uuid: bdeecbc27d6040f6b7c85c8a51ce0940
+          name: 'IP Office extensions discovery'
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#EXTNUM},.1.3.6.1.4.1.6889.2.2.1.1.1.1.1.2.1.2]'
+          key: ipo.ext.discovery
+          delay: 1h
+          lifetime: 30d
+          description: 'Discovers Avaya IP Office extensions (33 rows): extension number, port, user name, full name, type, phone IP and MAC.'
+          item_prototypes:
+            - uuid: 9f317b3d18024585bda357ce0823c63e
+              name: 'Extension {#EXTNAME} ({#EXTNUM}): Full name'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.4.1.6889.2.2.1.1.1.1.1.2.1.5.{#SNMPINDEX}'
+              key: 'ipo.ext.fullname[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              value_type: CHAR
+              trends: '0'
+              tags:
+                - tag: component
+                  value: telephony
+            - uuid: 6252ae5e686d462caf050f04f9be7ae0
+              name: 'Extension {#EXTNAME} ({#EXTNUM}): Phone IP'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.4.1.6889.2.2.1.1.1.1.1.2.1.10.{#SNMPINDEX}'
+              key: 'ipo.ext.ip[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              value_type: CHAR
+              trends: '0'
+              tags:
+                - tag: component
+                  value: telephony
+            - uuid: 9e17e77df9b94e7cb0bb59c27edf5118
+              name: 'Extension {#EXTNAME} ({#EXTNUM}): Phone MAC'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.4.1.6889.2.2.1.1.1.1.1.2.1.11.{#SNMPINDEX}'
+              key: 'ipo.ext.mac[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              value_type: CHAR
+              trends: '0'
+              tags:
+                - tag: component
+                  value: telephony
+            - uuid: d4997c5fb1664a5e8eedde6ad987f7c6
+              name: 'Extension {#EXTNAME} ({#EXTNUM}): Number'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.4.1.6889.2.2.1.1.1.1.1.2.1.2.{#SNMPINDEX}'
+              key: 'ipo.ext.number[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              trends: 200d
+              tags:
+                - tag: component
+                  value: telephony
+            - uuid: ce2c682918b6462088d6b8c7d6057d24
+              name: 'Extension {#EXTNAME} ({#EXTNUM}): Port'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.4.1.6889.2.2.1.1.1.1.1.2.1.3.{#SNMPINDEX}'
+              key: 'ipo.ext.port[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              trends: 200d
+              tags:
+                - tag: component
+                  value: telephony
+            - uuid: 8e2a2c3cfdb74551abb116fdf250cfaa
+              name: 'Extension {#EXTNAME} ({#EXTNUM}): Type'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.4.1.6889.2.2.1.1.1.1.1.2.1.6.{#SNMPINDEX}'
+              key: 'ipo.ext.type[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              trends: 200d
+              tags:
+                - tag: component
+                  value: telephony
+            - uuid: 730e9cbf09ac4cb2b593f56b81ce87b7
+              name: 'Extension {#EXTNAME} ({#EXTNUM}): User name'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.4.1.6889.2.2.1.1.1.1.1.2.1.4.{#SNMPINDEX}'
+              key: 'ipo.ext.user[{#SNMPINDEX}]'
+              delay: 6h
+              history: 30d
+              value_type: CHAR
+              trends: '0'
+              tags:
+                - tag: component
+                  value: telephony
+        - uuid: 4a29a57ab80946daa524df0ee307c4a1
+          name: 'Network interfaces discovery'
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#IFNAME},.1.3.6.1.2.1.2.2.1.2,{#IFOPERSTATUS},.1.3.6.1.2.1.2.2.1.8,{#IFADMINSTATUS},.1.3.6.1.2.1.2.2.1.7,{#IFSPEED},.1.3.6.1.2.1.2.2.1.5]'
+          key: net.if.discovery
+          delay: 1h
+          lifetime: 30d
+          description: 'Discovers RFC1213 ifTable interfaces (LAN1/LAN2). {#SNMPINDEX} is the ifIndex.'
+          item_prototypes:
+            - uuid: cf3e3289245d4d169e41ec09775ff3ad
+              name: 'Interface {#IFNAME}: Administrative status'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.7.{#SNMPINDEX}'
+              key: 'net.if.admin[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              valuemap:
+                name: 'IF administrative status'
+            - uuid: 4fe5722603004f958e892025eb1c9cc8
+              name: 'Interface {#IFNAME}: Bits received'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.10.{#SNMPINDEX}'
+              key: 'net.if.in.bytes[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              units: bps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+                - type: MULTIPLIER
+                  parameters:
+                    - '8'
+            - uuid: b7818ae962eb4ad9a588a7d0a8585012
+              name: 'Interface {#IFNAME}: Inbound discards'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.13.{#SNMPINDEX}'
+              key: 'net.if.in.discards[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+              trigger_prototypes:
+                - uuid: dbf1cda7936e403d9a73879c1610be09
+                  expression: 'min(/Avaya IP Office 500 V2 by SNMP/net.if.in.discards[{#SNMPINDEX}],5m)>{$IF_ERRORS_THRESHOLD}'
+                  name: 'Interface {#IFNAME}: High inbound discards'
+                  priority: WARNING
+                  description: 'More than {$IF_ERRORS_THRESHOLD} discards per second for 5 minutes.'
+            - uuid: a51c5131fca04a508c876051d5afb19a
+              name: 'Interface {#IFNAME}: Inbound errors'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.14.{#SNMPINDEX}'
+              key: 'net.if.in.errors[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+              trigger_prototypes:
+                - uuid: a32634e6c5a946cf8173c73f11ac7246
+                  expression: 'min(/Avaya IP Office 500 V2 by SNMP/net.if.in.errors[{#SNMPINDEX}],5m)>{$IF_ERRORS_THRESHOLD}'
+                  name: 'Interface {#IFNAME}: High inbound error rate'
+                  priority: WARNING
+                  description: 'More than {$IF_ERRORS_THRESHOLD} errors per second for 5 minutes.'
+            - uuid: e6a6b01a4495463ea395d918763787ca
+              name: 'Interface {#IFNAME}: Packets received'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.11.{#SNMPINDEX}'
+              key: 'net.if.in.packets[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+            - uuid: 1b7e2af9312a4bd0b396a13874416a4f
+              name: 'Interface {#IFNAME}: MAC address'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.6.{#SNMPINDEX}'
+              key: 'net.if.mac[{#SNMPINDEX}]'
+              delay: 1h
+              history: 30d
+              value_type: CHAR
+              trends: '0'
+            - uuid: f9c5bcccc89f41ce8eb489d7438959b6
+              name: 'Interface {#IFNAME}: Bits sent'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.16.{#SNMPINDEX}'
+              key: 'net.if.out.bytes[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              units: bps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+                - type: MULTIPLIER
+                  parameters:
+                    - '8'
+            - uuid: 6e435b2878904c2e9a4e0b3233b449eb
+              name: 'Interface {#IFNAME}: Outbound discards'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.19.{#SNMPINDEX}'
+              key: 'net.if.out.discards[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+              trigger_prototypes:
+                - uuid: 2d02a91c688341e380d3d8ba2845cb33
+                  expression: 'min(/Avaya IP Office 500 V2 by SNMP/net.if.out.discards[{#SNMPINDEX}],5m)>{$IF_ERRORS_THRESHOLD}'
+                  name: 'Interface {#IFNAME}: High outbound discards'
+                  priority: WARNING
+                  description: 'More than {$IF_ERRORS_THRESHOLD} discards per second for 5 minutes.'
+            - uuid: 159360dd93bb4754b84b6c14edcef61a
+              name: 'Interface {#IFNAME}: Outbound errors'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.20.{#SNMPINDEX}'
+              key: 'net.if.out.errors[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+              trigger_prototypes:
+                - uuid: 19230c6b0ed5435788e1d6f74b2958d1
+                  expression: 'min(/Avaya IP Office 500 V2 by SNMP/net.if.out.errors[{#SNMPINDEX}],5m)>{$IF_ERRORS_THRESHOLD}'
+                  name: 'Interface {#IFNAME}: High outbound error rate'
+                  priority: WARNING
+                  description: 'More than {$IF_ERRORS_THRESHOLD} errors per second for 5 minutes.'
+            - uuid: 5d258437b2014242b12aac3c916afc5f
+              name: 'Interface {#IFNAME}: Packets sent'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.17.{#SNMPINDEX}'
+              key: 'net.if.out.packets[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+            - uuid: 7d26da002e98478698b3493dc7ddca1c
+              name: 'Interface {#IFNAME}: Speed'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.5.{#SNMPINDEX}'
+              key: 'net.if.speed[{#SNMPINDEX}]'
+              delay: 1h
+              history: 90d
+              trends: 200d
+              units: bps
+            - uuid: cc57203fc0cc4b98815477ec6d8edcae
+              name: 'Interface {#IFNAME}: Operational status'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.8.{#SNMPINDEX}'
+              key: 'net.if.status[{#SNMPINDEX}]'
+              delay: 3m
+              history: 90d
+              trends: 200d
+              valuemap:
+                name: 'IF operational status'
+          trigger_prototypes:
+            - uuid: f015a1256327448489e7f25a9dd13f00
+              expression: 'min(/Avaya IP Office 500 V2 by SNMP/net.if.in.bytes[{#SNMPINDEX}],5m)>(last(/Avaya IP Office 500 V2 by SNMP/net.if.speed[{#SNMPINDEX}])*({$IF_UTIL_MAX}/100))'
+              name: 'Interface {#IFNAME}: High inbound utilization'
+              opdata: 'Util: {ITEM.LASTVALUE1}'
+              priority: WARNING
+              description: 'Inbound traffic exceeds {$IF_UTIL_MAX}%% of bandwidth for 5 minutes.'
+            - uuid: a303efee4d934ae98fd95ce2796851a7
+              expression: 'min(/Avaya IP Office 500 V2 by SNMP/net.if.out.bytes[{#SNMPINDEX}],5m)>(last(/Avaya IP Office 500 V2 by SNMP/net.if.speed[{#SNMPINDEX}])*({$IF_UTIL_MAX}/100))'
+              name: 'Interface {#IFNAME}: High outbound utilization'
+              opdata: 'Util: {ITEM.LASTVALUE1}'
+              priority: WARNING
+              description: 'Outbound traffic exceeds {$IF_UTIL_MAX}%% of bandwidth for 5 minutes.'
+            - uuid: 00b14cbe18ab4a268590a4a969ce9e20
+              expression: 'last(/Avaya IP Office 500 V2 by SNMP/net.if.status[{#SNMPINDEX}])=2 and last(/Avaya IP Office 500 V2 by SNMP/net.if.admin[{#SNMPINDEX}])=1'
+              name: 'Interface {#IFNAME}: Link down'
+              priority: AVERAGE
+              description: 'Interface is down while administratively up.'
+          graph_prototypes:
+            - uuid: 7141cf785d2a4cbca359d162082a04c5
+              name: 'Interface {#IFNAME}: Network traffic'
+              ymin_type_1: FIXED
+              graph_items:
+                - drawtype: FILLED_REGION
+                  color: 1A7C11
+                  item:
+                    host: 'Avaya IP Office 500 V2 by SNMP'
+                    key: 'net.if.in.bytes[{#SNMPINDEX}]'
+                - sortorder: '1'
+                  color: 2774A4
+                  item:
+                    host: 'Avaya IP Office 500 V2 by SNMP'
+                    key: 'net.if.out.bytes[{#SNMPINDEX}]'
+      macros:
+        - macro: '{$ICMP_LOSS_WARN}'
+          value: '20'
+          description: 'ICMP packet loss percent for Warning trigger.'
+        - macro: '{$ICMP_RESPONSE_TIME_WARN}'
+          value: '0.15'
+          description: 'Average ICMP response time (seconds) for Warning trigger.'
+        - macro: '{$IF_ERRORS_THRESHOLD}'
+          value: '2'
+          description: 'Threshold of interface error/discard rate (per second) for Warning triggers.'
+        - macro: '{$IF_UTIL_MAX}'
+          value: '80'
+          description: 'Percent of interface bandwidth utilization for Warning trigger.'
+      dashboards:
+        - uuid: 9644600e6af044f7984d69c8f46e4f65
+          name: 'Avaya IP Office 500 V2'
+          pages:
+            - widgets:
+                - type: graphprototype
+                  name: 'Interface traffic'
+                  width: '24'
+                  height: '7'
+                  fields:
+                    - type: INTEGER
+                      name: columns
+                      value: '24'
+                    - type: GRAPH_PROTOTYPE
+                      name: graphid.0
+                      value:
+                        host: 'Avaya IP Office 500 V2 by SNMP'
+                        name: 'Interface {#IFNAME}: Network traffic'
+                    - type: STRING
+                      name: reference
+                      value: 842RY
+                - type: graph
+                  name: 'ICMP response time'
+                  'y': '7'
+                  width: '12'
+                  height: '6'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: 'Avaya IP Office 500 V2 by SNMP'
+                        name: 'ICMP response time'
+                    - type: STRING
+                      name: reference
+                      value: MY1YT
+                - type: graph
+                  name: 'SNMP packets'
+                  'y': '13'
+                  width: '12'
+                  height: '6'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: 'Avaya IP Office 500 V2 by SNMP'
+                        name: 'SNMP packets'
+                    - type: STRING
+                      name: reference
+                      value: NWH1F
+                - type: graph
+                  name: 'TCP connections'
+                  x: '12'
+                  'y': '7'
+                  width: '12'
+                  height: '6'
+                  fields:
+                    - type: GRAPH
+                      name: graphid.0
+                      value:
+                        host: 'Avaya IP Office 500 V2 by SNMP'
+                        name: 'TCP connections'
+                    - type: STRING
+                      name: reference
+                      value: YLMDD
+      valuemaps:
+        - uuid: 7c07073da210473188a21045a489a5ce
+          name: Boolean
+          mappings:
+            - value: '1'
+              newvalue: 'true'
+            - value: '2'
+              newvalue: 'false'
+        - uuid: df2ffe5455f84330be4b9e67cf53b267
+          name: 'Entity class'
+          mappings:
+            - value: '1'
+              newvalue: other
+            - value: '2'
+              newvalue: unknown
+            - value: '3'
+              newvalue: chassis
+            - value: '4'
+              newvalue: backplane
+            - value: '5'
+              newvalue: container
+            - value: '6'
+              newvalue: powerSupply
+            - value: '7'
+              newvalue: fan
+            - value: '8'
+              newvalue: sensor
+            - value: '9'
+              newvalue: module
+            - value: '10'
+              newvalue: port
+            - value: '11'
+              newvalue: stack
+        - uuid: aad71e43eabe4394bf4396360b22169b
+          name: 'ICMP status'
+          mappings:
+            - value: '0'
+              newvalue: Down
+            - value: '1'
+              newvalue: Up
+        - uuid: 2510f1e6bd07458bb5c2fb3bd7becf4a
+          name: 'IF administrative status'
+          mappings:
+            - value: '1'
+              newvalue: up
+            - value: '2'
+              newvalue: down
+            - value: '3'
+              newvalue: testing
+        - uuid: 2677939ef50745c89116b78cb909723a
+          name: 'IF operational status'
+          mappings:
+            - value: '1'
+              newvalue: up
+            - value: '2'
+              newvalue: down
+            - value: '3'
+              newvalue: testing
+            - value: '4'
+              newvalue: unknown
+            - value: '5'
+              newvalue: dormant
+            - value: '6'
+              newvalue: notPresent
+            - value: '7'
+              newvalue: lowerLayerDown
+        - uuid: f7337c0c50974acda0e1e0adff1ccb0b
+          name: 'SNMP agent availability'
+          mappings:
+            - value: '0'
+              newvalue: 'Not available'
+            - value: '1'
+              newvalue: Available
+            - value: '2'
+              newvalue: Unknown
+  graphs:
+    - uuid: dceb1280526245b5addb024f33679ae4
+      name: 'ICMP response time'
+      ymin_type_1: FIXED
+      graph_items:
+        - drawtype: FILLED_REGION
+          color: 2774A4
+          item:
+            host: 'Avaya IP Office 500 V2 by SNMP'
+            key: icmppingsec
+    - uuid: c5c38bfa88bd4863a613acb543fd5d2a
+      name: 'SNMP packets'
+      ymin_type_1: FIXED
+      graph_items:
+        - drawtype: FILLED_REGION
+          color: 1A7C11
+          item:
+            host: 'Avaya IP Office 500 V2 by SNMP'
+            key: snmp.in.packets
+        - sortorder: '1'
+          color: 2774A4
+          item:
+            host: 'Avaya IP Office 500 V2 by SNMP'
+            key: snmp.out.packets
+    - uuid: 3e12b29e533f4ebba74b98022b598251
+      name: 'TCP connections'
+      ymin_type_1: FIXED
+      graph_items:
+        - drawtype: FILLED_REGION
+          color: 1A7C11
+          item:
+            host: 'Avaya IP Office 500 V2 by SNMP'
+            key: tcp.curr.estab

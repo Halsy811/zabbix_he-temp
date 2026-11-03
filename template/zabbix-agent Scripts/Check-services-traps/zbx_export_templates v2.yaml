@@ -1,5 +1,5 @@
 zabbix_export:
-  version: '7.4'
+  version: '7.0'
   template_groups:
     - uuid: a571c0d144b14fd4a87a9d9b2aa9fcd6
       name: Templates/Applications
@@ -20,6 +20,7 @@ zabbix_export:
           key: service.check.trap
           history: 2d
           value_type: TEXT
+          trends: '0'
           description: 'Агент (активные проверки) запускает service-check.ps1 по расписанию этого элемента. Скрипт берёт список служб из СВОЕГО конфига ($ServiceList внутри скрипта), проверяет их и ОТПРАВЛЯЕТ результат трапом (zabbix_sender -> service.states, порт 10051). Значение элемента — статус отправки: ''OK: processed: 1...'' или ''FAIL: ...''.'
           triggers:
             - uuid: 9a42cb5321bb4ef495558aaa2666cf58
@@ -33,19 +34,22 @@ zabbix_export:
           name: 'Обнаружение служб (из {$SERVICELIST})'
           type: DEPENDENT
           key: service.discovery.traps.scr
+          delay: '0'
           description: 'Зависимое LLD от мастер-элемента. Макрос {#SERVICE} берётся автоматически из ключей JSON, который возвращает service-check.ps1.'
           item_prototypes:
             - uuid: 40e063429ad546489bb502dfd4229554
               name: 'Служба {#SERVICE}: состояние'
               type: DEPENDENT
               key: 'service.state[{#SERVICE}]'
+              delay: '0'
               history: 2d
               value_type: TEXT
+              trends: '0'
               description: 'Состояние службы из общего JSON: Running/Stopped/Paused/StartPending/StopPending/PausePending/ContinuePending; NotFound/AccessDenied/Unreachable/Error при проблемах проверки.'
               preprocessing:
                 - type: REGEX
                   parameters:
-                    - '"\{#SERVICE\}":"[^"]*","state":"([^"]+)"'
+                    - '"service":"{#SERVICE}","state":"([^"]+)"'
                     - \1
                   error_handler: DISCARD_VALUE
               master_item:
@@ -62,7 +66,7 @@ zabbix_export:
                   tags:
                     - tag: hide_notifications
                       value: '3:55-4:15'
-                    - tag: service
+                    - tag: host_service
                       value: '{#SERVICE}'
                 - uuid: 2c4752bc8fce4d8fb4ad2dcf30277d99
                   expression: 'find(/Windows Services State by Agent Script - Traps v2/service.state[{#SERVICE}],,"like","Stopped")=1 or find(/Windows Services State by Agent Script - Traps v2/service.state[{#SERVICE}],,"like","Paused")=1'
@@ -72,11 +76,10 @@ zabbix_export:
                   tags:
                     - tag: hide_notifications
                       value: '3:55-4:15'
-                    - tag: service
+                    - tag: host_service
                       value: '{#SERVICE}'
           master_item:
             key: service.check.trap
-          preprocessing:
-            - type: JSONPATH
-              parameters:
-                - $.data
+          lld_macro_paths:
+            - lld_macro: '{#SERVICE}'
+              path: $.service
