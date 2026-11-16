@@ -1,0 +1,923 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: 36bff6c29af64692839d077febfc7079
+      name: 'Templates/Network devices'
+  templates:
+    - uuid: 392e59dad0074ee7927023ef3e79ea4b
+      template: 'Keenetic by SNMP'
+      name: 'Keenetic by SNMP'
+      description: |
+        Universal monitoring of Keenetic routers via SNMP (v1/2c). One template for all Keenetic models with the SNMP component (KeeneticOS 2.06+); interface LLD adapts to each model.
+
+        Monitors:
+        - System: uptime, name, description, location, contact, services.
+        - CPU: utilization (computed from UCD ssCpuRaw counters).
+        - Memory: total/available/buffers/cached + utilization %.
+        - Load average: 1 / 5 / 15 min.
+        - Interfaces (LLD): traffic in/out (64-bit), oper/admin status, in/out errors, in/out discards, MAC.
+
+        Keenetic firmware exposes only standard MIBs (SNMPv2-MIB, IF-MIB, UCD-SNMP, HOST-RESOURCES uptime). NOT available on any model: temperature, USB modems, WiFi clients, WAN/LTE signal, hrStorage/hrProcessor, CPU% OIDs, ifSpeed.
+
+        Flexible control via macros:
+        - Interface discovery: {$NET.IF.IFNAME.MATCHES} / {$NET.IF.IFNAME.NOT_MATCHES} / {$NET.IF.IFADMINSTATUS.NOT_MATCHES} (^2$ = skip admin-down) / {$NET.IF.IFOPERSTATUS.NOT_MATCHES} (^6$ = skip notPresent).
+        - Per-interface link-down mute: {$IFCONTROL}=0 globally, or context {$IFCONTROL:"ifName"}=0 for one interface.
+        - Thresholds: {$KEENETIC.CPU.UTIL.MAX} (%), {$KEENETIC.MEM.UTIL.MAX} (%), {$KEENETIC.LOAD.MAX} (load avg), {$KEENETIC.IF.ERRORS.RATIO.WARN} (% of unicast traffic).
+        - Interface error alerting uses an error-ratio metric; Wi-Fi radios are muted by default via {$KEENETIC.IF.ERRORS.CONTROL} (context regex). Override per interface: {$KEENETIC.IF.ERRORS.CONTROL:"ifName"}=0 / =1.
+        - SNMP community: {$SNMP_COMMUNITY} (default public).
+
+        Requirements: install the SNMP component on the router, set a read community, allow UDP/161. Trigger chain (CPU/mem/load/link/errors -> no SNMP data -> ICMP unavailable) so a full outage pages once.
+
+        Setup doc: https://support.keenetic.com/hero/kn-1012/en/51149-setting-up-snmp-server.html
+        MIBs:      https://files.docs.keenetic.net/UserGuide/Reference%20information/MIBs.zip
+
+        Author:  Konstantin Tyutyunnik / Константин Тютюнник
+        Site:    https://itforprof.com
+        Repo:    https://github.com/IT-for-Prof/zabbix-keenetic-snmp
+        License: MIT (c) 2026 Konstantin Tyutyunnik
+      vendor:
+        name: itforprof.com
+        version: 1.0.0
+      templates:
+        - name: 'ICMP Ping'
+      groups:
+        - name: 'Templates/Network devices'
+      items:
+        - uuid: 8b6ed8a78ed740ccb4f09f40556fdcdc
+          name: 'CPU: raw idle time'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.2021.11.53.0
+          key: cpu.raw.idle
+          history: 7d
+          value_type: FLOAT
+          trends: '0'
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          tags:
+            - tag: component
+              value: cpu
+            - tag: scope
+              value: performance
+        - uuid: 679c4f6502914e898cc57aa8ea4f22bf
+          name: 'CPU: raw nice time'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.2021.11.51.0
+          key: cpu.raw.nice
+          history: 7d
+          value_type: FLOAT
+          trends: '0'
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          tags:
+            - tag: component
+              value: cpu
+            - tag: scope
+              value: performance
+        - uuid: 46c1c25df62d4e4b843fb8856d31c3b8
+          name: 'CPU: raw system time'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.2021.11.52.0
+          key: cpu.raw.system
+          history: 7d
+          value_type: FLOAT
+          trends: '0'
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          tags:
+            - tag: component
+              value: cpu
+            - tag: scope
+              value: performance
+        - uuid: 7d5881a839e149c98c111c98209b5c25
+          name: 'CPU: raw user time'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.2021.11.50.0
+          key: cpu.raw.user
+          history: 7d
+          value_type: FLOAT
+          trends: '0'
+          preprocessing:
+            - type: CHANGE_PER_SECOND
+              parameters:
+                - ''
+          tags:
+            - tag: component
+              value: cpu
+            - tag: scope
+              value: performance
+        - uuid: a33fa86d3b4b4d61abdfbbcb867b43f8
+          name: 'CPU: utilization'
+          type: CALCULATED
+          key: cpu.util
+          history: 30d
+          value_type: FLOAT
+          trends: 180d
+          units: '%'
+          params: '100*(last(//cpu.raw.user)+last(//cpu.raw.nice)+last(//cpu.raw.system))/(last(//cpu.raw.user)+last(//cpu.raw.nice)+last(//cpu.raw.system)+last(//cpu.raw.idle))'
+          tags:
+            - tag: component
+              value: cpu
+            - tag: scope
+              value: performance
+          triggers:
+            - uuid: 39d3a5cd9acf428f9b0260f0157962fa
+              expression: 'avg(/Keenetic by SNMP/cpu.util,5m)>{$KEENETIC.CPU.UTIL.MAX}'
+              name: 'Keenetic: high CPU utilization (>{$KEENETIC.CPU.UTIL.MAX}%)'
+              event_name: 'Keenetic {HOST.NAME}: high CPU {ITEM.LASTVALUE1} (>{$KEENETIC.CPU.UTIL.MAX}%)'
+              priority: AVERAGE
+              dependencies:
+                - name: 'Keenetic: no SNMP data (10m)'
+                  expression: 'nodata(/Keenetic by SNMP/sysUpTime,10m)=1'
+              tags:
+                - tag: component
+                  value: cpu
+                - tag: scope
+                  value: performance
+        - uuid: 22f29c847d9b4ede95fc2c3029fc6838
+          name: 'Load average (1m)'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.2021.10.1.3.1
+          key: la.load.1
+          history: 30d
+          value_type: FLOAT
+          trends: 180d
+          tags:
+            - tag: component
+              value: cpu
+            - tag: scope
+              value: performance
+        - uuid: 1781a395c6574720846b1b8ac8da4205
+          name: 'Load average (5m)'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.2021.10.1.3.2
+          key: la.load.5
+          history: 30d
+          value_type: FLOAT
+          trends: 180d
+          tags:
+            - tag: component
+              value: cpu
+            - tag: scope
+              value: performance
+          triggers:
+            - uuid: 97d0f2cd6b37400ba3f8a1ab9659d005
+              expression: 'avg(/Keenetic by SNMP/la.load.5,10m)>{$KEENETIC.LOAD.MAX}'
+              name: 'Keenetic: high load average (>{$KEENETIC.LOAD.MAX})'
+              event_name: 'Keenetic {HOST.NAME}: load average {ITEM.LASTVALUE1} (>{$KEENETIC.LOAD.MAX})'
+              priority: WARNING
+              dependencies:
+                - name: 'Keenetic: no SNMP data (10m)'
+                  expression: 'nodata(/Keenetic by SNMP/sysUpTime,10m)=1'
+              tags:
+                - tag: component
+                  value: cpu
+                - tag: scope
+                  value: performance
+        - uuid: d93f40ad60dd404db7f22a44bf1166ec
+          name: 'Load average (15m)'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.2021.10.1.3.3
+          key: la.load.15
+          history: 30d
+          value_type: FLOAT
+          trends: 180d
+          tags:
+            - tag: component
+              value: cpu
+            - tag: scope
+              value: performance
+        - uuid: d48e99e6f75e4e398658b0fa406f6098
+          name: 'Memory: available (free)'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.2021.4.6.0
+          key: mem.avail
+          history: 30d
+          trends: 180d
+          units: B
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - '1024'
+          tags:
+            - tag: component
+              value: memory
+            - tag: scope
+              value: performance
+        - uuid: b0e83b23cac94b9b8975c04ac4ceef7c
+          name: 'Memory: buffers'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.2021.4.14.0
+          key: mem.buffer
+          history: 30d
+          trends: 180d
+          units: B
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - '1024'
+          tags:
+            - tag: component
+              value: memory
+            - tag: scope
+              value: performance
+        - uuid: 4e341bd56e574f89abd480eecfe58a9d
+          name: 'Memory: cached'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.2021.4.15.0
+          key: mem.cached
+          history: 30d
+          trends: 180d
+          units: B
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - '1024'
+          tags:
+            - tag: component
+              value: memory
+            - tag: scope
+              value: performance
+        - uuid: e8ef8a7e32584492bf21ccd0b15cad7d
+          name: 'Memory: total'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.2021.4.5.0
+          key: mem.total
+          history: 30d
+          trends: 180d
+          units: B
+          preprocessing:
+            - type: MULTIPLIER
+              parameters:
+                - '1024'
+          tags:
+            - tag: component
+              value: memory
+            - tag: scope
+              value: performance
+        - uuid: db759e47e7464d2991624feb5bfc4e90
+          name: 'Memory: utilization'
+          type: CALCULATED
+          key: mem.util
+          history: 30d
+          value_type: FLOAT
+          trends: 180d
+          units: '%'
+          params: '100*(last(//mem.total)-last(//mem.avail)-last(//mem.buffer)-last(//mem.cached))/last(//mem.total)'
+          tags:
+            - tag: component
+              value: memory
+            - tag: scope
+              value: performance
+          triggers:
+            - uuid: 7d69f6c282c54e87ab551e0d639d6c58
+              expression: 'min(/Keenetic by SNMP/mem.util,5m)>{$KEENETIC.MEM.UTIL.MAX}'
+              name: 'Keenetic: high memory utilization (>{$KEENETIC.MEM.UTIL.MAX}%)'
+              event_name: 'Keenetic {HOST.NAME}: high memory {ITEM.LASTVALUE1} (>{$KEENETIC.MEM.UTIL.MAX}%)'
+              priority: AVERAGE
+              dependencies:
+                - name: 'Keenetic: no SNMP data (10m)'
+                  expression: 'nodata(/Keenetic by SNMP/sysUpTime,10m)=1'
+              tags:
+                - tag: component
+                  value: memory
+                - tag: scope
+                  value: performance
+        - uuid: 9df0ef833baa4b6f9c17288bda0d59af
+          name: 'System: contact'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.1.4.0
+          key: sysContact
+          delay: 12h
+          history: 30d
+          value_type: TEXT
+          trends: '0'
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+          tags:
+            - tag: component
+              value: system
+            - tag: scope
+              value: inventory
+        - uuid: 224c697d4a354f28b555136ca63b2f02
+          name: 'System: description'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.1.1.0
+          key: sysDescr
+          delay: 12h
+          history: 30d
+          value_type: TEXT
+          trends: '0'
+          inventory_link: OS_FULL
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+          tags:
+            - tag: component
+              value: system
+            - tag: scope
+              value: inventory
+        - uuid: 9b57b78b57a5429f8692aae36c23410e
+          name: 'System: location'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.1.6.0
+          key: sysLocation
+          delay: 12h
+          history: 30d
+          value_type: TEXT
+          trends: '0'
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+          tags:
+            - tag: component
+              value: system
+            - tag: scope
+              value: inventory
+        - uuid: b673b7d405014d94abbb3f6db41042bb
+          name: 'System: name'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.5.0
+          key: sysName
+          delay: 12h
+          history: 30d
+          value_type: TEXT
+          trends: '0'
+          inventory_link: NAME
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+          tags:
+            - tag: component
+              value: system
+            - tag: scope
+              value: inventory
+        - uuid: 126d1bc810784ffd931e184d2221caaf
+          name: 'System: services'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.1.7.0
+          key: sysServices
+          delay: 12h
+          history: 14d
+          trends: '0'
+          preprocessing:
+            - type: DISCARD_UNCHANGED_HEARTBEAT
+              parameters:
+                - 1h
+          tags:
+            - tag: component
+              value: system
+            - tag: scope
+              value: inventory
+        - uuid: d1f81d6f2267448bb974515ac3cf6e65
+          name: 'System: uptime'
+          type: SNMP_AGENT
+          snmp_oid: 1.3.6.1.2.1.1.3.0
+          key: sysUpTime
+          history: 30d
+          trends: 180d
+          units: uptime
+          preprocessing:
+            - type: RTRIM
+              parameters:
+                - s
+            - type: MULTIPLIER
+              parameters:
+                - '0.01'
+          tags:
+            - tag: component
+              value: system
+            - tag: scope
+              value: performance
+          triggers:
+            - uuid: a86156c6c01449eca0096c3e32250096
+              expression: 'last(/Keenetic by SNMP/sysUpTime)<10m'
+              name: 'Keenetic: device has been restarted'
+              event_name: 'Keenetic {HOST.NAME}: restarted (uptime {ITEM.LASTVALUE1})'
+              priority: INFO
+              manual_close: 'YES'
+              tags:
+                - tag: component
+                  value: os
+                - tag: scope
+                  value: notice
+            - uuid: 4a518a2bb04f42dab4e624e9a864c6ba
+              expression: 'nodata(/Keenetic by SNMP/sysUpTime,10m)=1'
+              name: 'Keenetic: no SNMP data (10m)'
+              event_name: 'Keenetic {HOST.NAME}: no SNMP data for 10m (device or tunnel down?)'
+              priority: WARNING
+              description: 'No SNMP data for 10 minutes - device or tunnel may be down'
+              dependencies:
+                - name: 'Недоступен при проверке ICMP ping'
+                  expression: 'max(/Keenetic by SNMP/icmpping,#3)=0'
+              tags:
+                - tag: component
+                  value: availability
+                - tag: scope
+                  value: availability
+      discovery_rules:
+        - uuid: b76973094a4e4d79ba749d18dcb36d2b
+          name: 'Network interfaces discovery'
+          type: SNMP_AGENT
+          snmp_oid: 'discovery[{#IFNAME},1.3.6.1.2.1.31.1.1.1.1,{#IFADMINSTATUS},1.3.6.1.2.1.2.2.1.7,{#IFOPERSTATUS},1.3.6.1.2.1.2.2.1.8,{#IFTYPE},1.3.6.1.2.1.2.2.1.3]'
+          key: net.if.discovery
+          delay: 1h
+          filter:
+            evaltype: AND
+            conditions:
+              - macro: '{#IFADMINSTATUS}'
+                value: '{$NET.IF.IFADMINSTATUS.NOT_MATCHES}'
+                operator: NOT_MATCHES_REGEX
+                formulaid: A
+              - macro: '{#IFNAME}'
+                value: '{$NET.IF.IFNAME.MATCHES}'
+                formulaid: B
+              - macro: '{#IFNAME}'
+                value: '{$NET.IF.IFNAME.NOT_MATCHES}'
+                operator: NOT_MATCHES_REGEX
+                formulaid: C
+              - macro: '{#IFOPERSTATUS}'
+                value: '{$NET.IF.IFOPERSTATUS.NOT_MATCHES}'
+                operator: NOT_MATCHES_REGEX
+                formulaid: D
+          lifetime: 30d
+          enabled_lifetime_type: DISABLE_AFTER
+          enabled_lifetime: 1d
+          item_prototypes:
+            - uuid: dbaa2f23855c43459370dc498b9f4c68
+              name: 'Interface {#IFNAME}: administrative status'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.7.{#SNMPINDEX}'
+              key: 'net.if.adminstatus[{#SNMPINDEX}]'
+              delay: 1h
+              history: 30d
+              trends: '0'
+              valuemap:
+                name: ifAdminStatus
+              preprocessing:
+                - type: DISCARD_UNCHANGED_HEARTBEAT
+                  parameters:
+                    - 1h
+              tags:
+                - tag: component
+                  value: network
+                - tag: interface
+                  value: '{#IFNAME}'
+                - tag: scope
+                  value: availability
+            - uuid: 34741cb8c93a4ad5a6a5120320bac11c
+              name: 'Interface {#IFNAME}: inbound discards'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.13.{#SNMPINDEX}'
+              key: 'net.if.in.discards[{#SNMPINDEX}]'
+              history: 7d
+              value_type: FLOAT
+              trends: 180d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+              tags:
+                - tag: component
+                  value: network
+                - tag: interface
+                  value: '{#IFNAME}'
+                - tag: scope
+                  value: performance
+            - uuid: aa640bf6d33245d4b80a13c98cc65264
+              name: 'Interface {#IFNAME}: inbound errors'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.14.{#SNMPINDEX}'
+              key: 'net.if.in.errors[{#SNMPINDEX}]'
+              history: 7d
+              value_type: FLOAT
+              trends: 180d
+              units: eps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+              tags:
+                - tag: component
+                  value: network
+                - tag: interface
+                  value: '{#IFNAME}'
+                - tag: scope
+                  value: performance
+            - uuid: b551a0f5928c478aa84d039c25472af0
+              name: 'Interface {#IFNAME}: inbound unicast packets'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.31.1.1.1.7.{#SNMPINDEX}'
+              key: 'net.if.in.ucast.pkts[{#SNMPINDEX}]'
+              history: 7d
+              value_type: FLOAT
+              trends: 180d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+              tags:
+                - tag: component
+                  value: network
+                - tag: interface
+                  value: '{#IFNAME}'
+                - tag: scope
+                  value: performance
+            - uuid: a85f25a88a1540469910c4be67836537
+              name: 'Interface {#IFNAME}: inbound error ratio'
+              type: CALCULATED
+              key: 'net.if.in.error.ratio[{#SNMPINDEX}]'
+              delay: 1m
+              history: 7d
+              value_type: FLOAT
+              trends: 180d
+              units: '%'
+              params: '100*last(//net.if.in.errors[{#SNMPINDEX}])/(last(//net.if.in.errors[{#SNMPINDEX}])+last(//net.if.in.ucast.pkts[{#SNMPINDEX}])+((last(//net.if.in.errors[{#SNMPINDEX}])+last(//net.if.in.ucast.pkts[{#SNMPINDEX}]))=0))'
+              tags:
+                - tag: component
+                  value: network
+                - tag: interface
+                  value: '{#IFNAME}'
+                - tag: scope
+                  value: performance
+              trigger_prototypes:
+                - uuid: 439f3fc5212e4165b38030df66b7cdeb
+                  expression: '{$KEENETIC.IF.ERRORS.CONTROL:"{#IFNAME}"}=1 and min(/Keenetic by SNMP/net.if.in.error.ratio[{#SNMPINDEX}],5m)>{$KEENETIC.IF.ERRORS.RATIO.WARN:"{#IFNAME}"}'
+                  name: 'Interface {#IFNAME}: high inbound error ratio'
+                  event_name: 'Keenetic {HOST.NAME}: interface {#IFNAME} inbound error ratio {ITEM.LASTVALUE1} (>{$KEENETIC.IF.ERRORS.RATIO.WARN:"{#IFNAME}"}%)'
+                  priority: WARNING
+                  description: 'Inbound errors as a share of inbound unicast traffic. Wi-Fi radios are muted by default via {$KEENETIC.IF.ERRORS.CONTROL} (ifInErrors there is RF noise, not link health).'
+                  dependencies:
+                    - name: 'Keenetic: no SNMP data (10m)'
+                      expression: 'nodata(/Keenetic by SNMP/sysUpTime,10m)=1'
+                  tags:
+                    - tag: component
+                      value: network
+                    - tag: interface
+                      value: '{#IFNAME}'
+                    - tag: scope
+                      value: performance
+            - uuid: 17b2a23e3cc74dddbb7e54635de3fd3e
+              name: 'Interface {#IFNAME}: bits received'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.31.1.1.1.6.{#SNMPINDEX}'
+              key: 'net.if.in[{#SNMPINDEX}]'
+              history: 7d
+              value_type: FLOAT
+              trends: 180d
+              units: bps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+                - type: MULTIPLIER
+                  parameters:
+                    - '8'
+              tags:
+                - tag: component
+                  value: network
+                - tag: interface
+                  value: '{#IFNAME}'
+                - tag: scope
+                  value: performance
+            - uuid: a600b506099d4fbb98a774a7c0d17e85
+              name: 'Interface {#IFNAME}: MAC address'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.6.{#SNMPINDEX}'
+              key: 'net.if.mac[{#SNMPINDEX}]'
+              delay: 1h
+              history: 7d
+              value_type: TEXT
+              trends: '0'
+              preprocessing:
+                - type: DISCARD_UNCHANGED_HEARTBEAT
+                  parameters:
+                    - 1h
+              tags:
+                - tag: component
+                  value: network
+                - tag: interface
+                  value: '{#IFNAME}'
+                - tag: scope
+                  value: inventory
+            - uuid: 10cd54f586304c6e8be5aa7f67cd8ca7
+              name: 'Interface {#IFNAME}: outbound discards'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.19.{#SNMPINDEX}'
+              key: 'net.if.out.discards[{#SNMPINDEX}]'
+              history: 7d
+              value_type: FLOAT
+              trends: 180d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+              tags:
+                - tag: component
+                  value: network
+                - tag: interface
+                  value: '{#IFNAME}'
+                - tag: scope
+                  value: performance
+            - uuid: 3ceddb95134e48b9b4c82cab16e698cb
+              name: 'Interface {#IFNAME}: outbound errors'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.20.{#SNMPINDEX}'
+              key: 'net.if.out.errors[{#SNMPINDEX}]'
+              history: 7d
+              value_type: FLOAT
+              trends: 180d
+              units: eps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+              tags:
+                - tag: component
+                  value: network
+                - tag: interface
+                  value: '{#IFNAME}'
+                - tag: scope
+                  value: performance
+            - uuid: 5d2422b9b62a4842ab143ef567339412
+              name: 'Interface {#IFNAME}: outbound unicast packets'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.31.1.1.1.11.{#SNMPINDEX}'
+              key: 'net.if.out.ucast.pkts[{#SNMPINDEX}]'
+              history: 7d
+              value_type: FLOAT
+              trends: 180d
+              units: pps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+              tags:
+                - tag: component
+                  value: network
+                - tag: interface
+                  value: '{#IFNAME}'
+                - tag: scope
+                  value: performance
+            - uuid: 7dc36e76e1964b029a50fcb18746d95b
+              name: 'Interface {#IFNAME}: outbound error ratio'
+              type: CALCULATED
+              key: 'net.if.out.error.ratio[{#SNMPINDEX}]'
+              delay: 1m
+              history: 7d
+              value_type: FLOAT
+              trends: 180d
+              units: '%'
+              params: '100*last(//net.if.out.errors[{#SNMPINDEX}])/(last(//net.if.out.errors[{#SNMPINDEX}])+last(//net.if.out.ucast.pkts[{#SNMPINDEX}])+((last(//net.if.out.errors[{#SNMPINDEX}])+last(//net.if.out.ucast.pkts[{#SNMPINDEX}]))=0))'
+              tags:
+                - tag: component
+                  value: network
+                - tag: interface
+                  value: '{#IFNAME}'
+                - tag: scope
+                  value: performance
+              trigger_prototypes:
+                - uuid: a30204f761f942baa8fd8a1308503d63
+                  expression: '{$KEENETIC.IF.ERRORS.CONTROL:"{#IFNAME}"}=1 and min(/Keenetic by SNMP/net.if.out.error.ratio[{#SNMPINDEX}],5m)>{$KEENETIC.IF.ERRORS.RATIO.WARN:"{#IFNAME}"}'
+                  name: 'Interface {#IFNAME}: high outbound error ratio'
+                  event_name: 'Keenetic {HOST.NAME}: interface {#IFNAME} outbound error ratio {ITEM.LASTVALUE1} (>{$KEENETIC.IF.ERRORS.RATIO.WARN:"{#IFNAME}"}%)'
+                  priority: WARNING
+                  description: 'Outbound errors as a share of outbound unicast traffic. Wi-Fi radios are muted by default via {$KEENETIC.IF.ERRORS.CONTROL}.'
+                  dependencies:
+                    - name: 'Keenetic: no SNMP data (10m)'
+                      expression: 'nodata(/Keenetic by SNMP/sysUpTime,10m)=1'
+                  tags:
+                    - tag: component
+                      value: network
+                    - tag: interface
+                      value: '{#IFNAME}'
+                    - tag: scope
+                      value: performance
+            - uuid: 25a6f7ad5677462eae05aa7ef5ee8519
+              name: 'Interface {#IFNAME}: bits sent'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.31.1.1.1.10.{#SNMPINDEX}'
+              key: 'net.if.out[{#SNMPINDEX}]'
+              history: 7d
+              value_type: FLOAT
+              trends: 180d
+              units: bps
+              preprocessing:
+                - type: CHANGE_PER_SECOND
+                  parameters:
+                    - ''
+                - type: MULTIPLIER
+                  parameters:
+                    - '8'
+              tags:
+                - tag: component
+                  value: network
+                - tag: interface
+                  value: '{#IFNAME}'
+                - tag: scope
+                  value: performance
+            - uuid: 7d40eabd6b2e4b0aabb392c4f0923c62
+              name: 'Interface {#IFNAME}: operational status'
+              type: SNMP_AGENT
+              snmp_oid: '.1.3.6.1.2.1.2.2.1.8.{#SNMPINDEX}'
+              key: 'net.if.status[{#SNMPINDEX}]'
+              history: 30d
+              trends: '0'
+              valuemap:
+                name: ifOperStatus
+              preprocessing:
+                - type: DISCARD_UNCHANGED_HEARTBEAT
+                  parameters:
+                    - 1h
+              tags:
+                - tag: component
+                  value: network
+                - tag: interface
+                  value: '{#IFNAME}'
+                - tag: scope
+                  value: availability
+          trigger_prototypes:
+            - uuid: 680a4313b6fe4b6faef07dd157dc8ee3
+              expression: '{$IFCONTROL:"{#IFNAME}"}=1 and last(/Keenetic by SNMP/net.if.status[{#SNMPINDEX}],#1)=2 and last(/Keenetic by SNMP/net.if.status[{#SNMPINDEX}],#2)=1 and last(/Keenetic by SNMP/net.if.adminstatus[{#SNMPINDEX}])=1'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Keenetic by SNMP/net.if.status[{#SNMPINDEX}])<>2 or {$IFCONTROL:"{#IFNAME}"}=0'
+              name: 'Interface {#IFNAME}: link down'
+              event_name: 'Keenetic {HOST.NAME}: interface {#IFNAME} link down'
+              priority: WARNING
+              description: 'Fires only on an up->down transition (real link loss); stays until the link recovers. Never-connected ports do not alert.'
+              manual_close: 'YES'
+              dependencies:
+                - name: 'Keenetic: no SNMP data (10m)'
+                  expression: 'nodata(/Keenetic by SNMP/sysUpTime,10m)=1'
+              tags:
+                - tag: component
+                  value: network
+                - tag: interface
+                  value: '{#IFNAME}'
+                - tag: scope
+                  value: availability
+          graph_prototypes:
+            - uuid: be5338fd7d4a4d42a3a9847c8f1dae25
+              name: 'Interface {#IFNAME}: errors and discards'
+              graph_items:
+                - color: F63100
+                  item:
+                    host: 'Keenetic by SNMP'
+                    key: 'net.if.in.errors[{#SNMPINDEX}]'
+                - sortorder: '1'
+                  color: BB0000
+                  item:
+                    host: 'Keenetic by SNMP'
+                    key: 'net.if.out.errors[{#SNMPINDEX}]'
+                - sortorder: '2'
+                  color: F7941D
+                  item:
+                    host: 'Keenetic by SNMP'
+                    key: 'net.if.in.discards[{#SNMPINDEX}]'
+                - sortorder: '3'
+                  color: E29336
+                  item:
+                    host: 'Keenetic by SNMP'
+                    key: 'net.if.out.discards[{#SNMPINDEX}]'
+            - uuid: caf74bfbc11e4ab9a576c73d011a84a0
+              name: 'Interface {#IFNAME}: traffic'
+              graph_items:
+                - drawtype: GRADIENT_LINE
+                  color: 1A7C11
+                  item:
+                    host: 'Keenetic by SNMP'
+                    key: 'net.if.in[{#SNMPINDEX}]'
+                - sortorder: '1'
+                  color: 2774A4
+                  item:
+                    host: 'Keenetic by SNMP'
+                    key: 'net.if.out[{#SNMPINDEX}]'
+      tags:
+        - tag: class
+          value: network-device
+        - tag: target
+          value: keenetic
+        - tag: vendor
+          value: keenetic
+      macros:
+        - macro: '{$IFCONTROL}'
+          value: '1'
+          description: 'Link-down alerting master switch. Per-interface override: {$IFCONTROL:"ifName"}=0 to mute one interface'
+        - macro: '{$KEENETIC.CPU.UTIL.MAX}'
+          value: '90'
+        - macro: '{$KEENETIC.IF.ERRORS.CONTROL}'
+          value: '1'
+          description: 'Error-ratio alerting master switch. Per-interface override: {$KEENETIC.IF.ERRORS.CONTROL:"ifName"}=0 to mute one interface.'
+        - macro: '{$KEENETIC.IF.ERRORS.CONTROL:regex:"^(WifiMaster|AccessPoint|WiFi|Wlan)"}'
+          value: '0'
+          description: 'Mutes Wi-Fi radio interfaces from error-ratio alerts (ifInErrors on radios is RF/CRC noise, not link health). Data is still graphed. Narrow this pattern if per-band radio error alerting is ever wanted.'
+        - macro: '{$KEENETIC.IF.ERRORS.RATIO.WARN}'
+          value: '1'
+          description: 'Inbound/outbound error-ratio warning threshold, percent of unicast traffic. Per-interface override: {$KEENETIC.IF.ERRORS.RATIO.WARN:"ifName"}.'
+        - macro: '{$KEENETIC.LOAD.MAX}'
+          value: '4'
+        - macro: '{$KEENETIC.MEM.UTIL.MAX}'
+          value: '90'
+        - macro: '{$NET.IF.IFADMINSTATUS.NOT_MATCHES}'
+          value: ^2$
+          description: 'LLD: exclude by ifAdminStatus (2=down). Relax to also discover admin-down interfaces'
+        - macro: '{$NET.IF.IFNAME.MATCHES}'
+          value: '.*'
+          description: 'LLD: discover interfaces whose ifName matches this regex'
+        - macro: '{$NET.IF.IFNAME.NOT_MATCHES}'
+          value: Loopback
+          description: 'LLD: exclude interfaces whose ifName matches this regex'
+        - macro: '{$NET.IF.IFOPERSTATUS.NOT_MATCHES}'
+          value: ^6$
+          description: 'LLD: exclude by ifOperStatus (6=notPresent)'
+        - macro: '{$SNMP_COMMUNITY}'
+          value: public
+          description: 'SNMP v1/2c read community. Set on the host to override. Keenetic default: public'
+      valuemaps:
+        - uuid: 813811c6fd484590af59a46f7de314e6
+          name: ifAdminStatus
+          mappings:
+            - value: '1'
+              newvalue: up
+            - value: '2'
+              newvalue: down
+            - value: '3'
+              newvalue: testing
+        - uuid: b4ff61f07f974af7ab06c77dfac49f2f
+          name: ifOperStatus
+          mappings:
+            - value: '1'
+              newvalue: up
+            - value: '2'
+              newvalue: down
+            - value: '3'
+              newvalue: testing
+            - value: '4'
+              newvalue: unknown
+            - value: '5'
+              newvalue: dormant
+            - value: '6'
+              newvalue: notPresent
+            - value: '7'
+              newvalue: lowerLayerDown
+  graphs:
+    - uuid: a1c8e115afc84dffa7f3037fe0f16b0d
+      name: 'CPU utilization'
+      graph_items:
+        - drawtype: GRADIENT_LINE
+          color: 1A7C11
+          item:
+            host: 'Keenetic by SNMP'
+            key: cpu.util
+    - uuid: 89743590ba474e2ca3bad247d6cbee8d
+      name: 'Load average'
+      graph_items:
+        - color: 1A7C11
+          item:
+            host: 'Keenetic by SNMP'
+            key: la.load.1
+        - sortorder: '1'
+          color: 2774A4
+          item:
+            host: 'Keenetic by SNMP'
+            key: la.load.5
+        - sortorder: '2'
+          color: F63100
+          item:
+            host: 'Keenetic by SNMP'
+            key: la.load.15
+    - uuid: 90bb1d6e55a3476cb8c5b804a2788c00
+      name: 'Memory usage'
+      graph_items:
+        - color: 1A7C11
+          item:
+            host: 'Keenetic by SNMP'
+            key: mem.total
+        - sortorder: '1'
+          color: 2774A4
+          item:
+            host: 'Keenetic by SNMP'
+            key: mem.avail
+        - sortorder: '2'
+          color: F7941D
+          item:
+            host: 'Keenetic by SNMP'
+            key: mem.buffer
+        - sortorder: '3'
+          color: A754B2
+          item:
+            host: 'Keenetic by SNMP'
+            key: mem.cached
