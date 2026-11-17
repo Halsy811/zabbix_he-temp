@@ -1,0 +1,37 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates
+  templates:
+    - uuid: dba28b1f1b654c33baf6a71f87f0dc3a
+      template: 'Check Port by Macro'
+      name: 'Check Port by Macro'
+      groups:
+        - name: Templates
+      items:
+        - uuid: 04cbe89f2d0c4b7591fbb3c033af228a
+          name: 'Check Port {$CHECK_PORT}'
+          type: SIMPLE
+          key: 'net.tcp.service[tcp,,{$CHECK_PORT}]'
+          history: 90d
+          valuemap:
+            name: 'Port Check Status'
+          triggers:
+            - uuid: a46c24df95eb44d0aa31357ed6e8aeed
+              expression: 'last(/Check Port by Macro/net.tcp.service[tcp,,{$CHECK_PORT}],#1)=0'
+              name: 'Port {$CHECK_PORT} is not available on {HOST.NAME}'
+              priority: HIGH
+              manual_close: 'YES'
+      macros:
+        - macro: '{$CHECK_PORT}'
+          value: '3389'
+          description: 'Port number to check'
+      valuemaps:
+        - uuid: 044cbb8af06a4a8f947d1a8fce51cbbb
+          name: 'Port Check Status'
+          mappings:
+            - value: '0'
+              newvalue: 'port not available'
+            - value: '1'
+              newvalue: 'port available'
