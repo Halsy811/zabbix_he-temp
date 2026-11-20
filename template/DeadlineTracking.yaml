@@ -1,0 +1,119 @@
+zabbix_export:
+  version: '8.0'
+  template_groups:
+    - uuid: 7df96b18c230490a9a0a9e2307226338
+      name: Templates
+  templates:
+    - uuid: 92080f35b7174b38ba5d9c2f1ef03709
+      template: DeadlineTracking
+      name: DeadlineTracking
+      description: |
+        На узле должны быть созданы макросы:
+        - {$FILE_PATH}      C:/tmp/lin/listfn.csv   - Путь к файлу со стороны zabbix agent
+        - {$SEPARATOR}                                    - разделитель в файле (оставьте пустым. по умолчанию ';')
+        
+        примеры zabbix agent : UserParameter=
+        
+        UserParameter=custom.json.fn[*],python "C:\tmp\lin\script.py" --pathFile "$1" --zabbix --separator "$2"
+        
+        UserParameter=custom.json.fn[*],wsl python3 /mnt/c/tmp/lin/script.py --pathFile "$1" --separator "$2" --zabbix
+        
+        UserParameter=custom.json.fn[*]docker run --rm -v "C:\tmp\lin:/tmp/lin" python:3-slim python3 /tmp/lin/script.py --pathFile /tmp/lin/listfn.csv --separator "" --zabbix
+      groups:
+        - name: Templates
+      items:
+        - uuid: dfce09ee09d24ccda66df3b391de9d5c
+          name: custom.parser.file.json.fn
+          key: 'custom.parser.file.json.fn[{$FILE_PATH},{$SEPARATOR}]'
+          history: 1d
+          value_type: TEXT
+      discovery_rules:
+        - uuid: fd4a678d52da48a0848add279603401c
+          name: discovery.item.fn.date
+          type: DEPENDENT
+          key: discovery.item.fn.date
+          lifetime_type: DELETE_IMMEDIATELY
+          item_prototypes:
+            - uuid: cad40e6dcc05447ca93e972309f17fc9
+              name: '{#TYPE}: "{#ORGANISATION}"  {#ID}'
+              type: DEPENDENT
+              key: 'fn.date.string.[{#TYPE}-{#ORGANISATION}-{#ID}-{#HASH}]'
+              history: 1d
+              value_type: TEXT
+              description: '{#NOTE}'
+              preprocessing:
+                - type: JSONPATH
+                  parameters:
+                    - '$[?(@.hash == ''{#HASH}'')].expiration_date.first()'
+              master_item:
+                key: 'custom.parser.file.json.fn[{$FILE_PATH},{$SEPARATOR}]'
+            - uuid: 4b04ed6935254a358c3dd1cb95d16033
+              name: '{#TYPE}: "{#ORGANISATION}"  {#ID}'
+              type: DEPENDENT
+              key: 'fn.expiration.days.[{#TYPE}-{#ORGANISATION}-{#ID}-{#HASH}]'
+              history: 1d
+              value_type: FLOAT
+              trends: '0'
+              units: ост.дней
+              description: '{#NOTE}'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      // Возврат в разницы в днях между датой истечения и текущей датой
+                      if (!value) return;
+                      var parts = value.split('.');
+                      if (parts.length !== 3) return;
+                      
+                      var day = parseInt(parts[0], 10);
+                      var month = parseInt(parts[1], 10) - 1; // Месяцы в JS начинаются с 0
+                      var year = parseInt(parts[2], 10);
+                      
+                      // Целевая дата в секундах (UTC)
+                      var targetTimestamp = Math.floor(Date.UTC(year, month, day) / 1000);
+                      
+                      // Текущая дата в секундах (UTC)
+                      var currentTimestamp = Math.floor(Date.now() / 1000);
+                      
+                      // Разница в секундах
+                      var diffSeconds = targetTimestamp - currentTimestamp;
+                      
+                      // Переводим в дни и округляем вниз до целого числа
+                      var daysRemaining = Math.floor(diffSeconds / 86400);
+                      
+                      return daysRemaining;
+              master_item:
+                key: 'fn.date.string.[{#TYPE}-{#ORGANISATION}-{#ID}-{#HASH}]'
+              tags:
+                - tag: Тип
+                  value: Deadline_trigger_1
+              trigger_prototypes:
+                - uuid: 329151c2585e49f4af269593ba2cd1c3
+                  expression: 'last(/DeadlineTracking/fn.expiration.days.[{#TYPE}-{#ORGANISATION}-{#ID}-{#HASH}]) < {$EXPIRATION_DAYS_TRIGGER}'
+                  recovery_mode: RECOVERY_EXPRESSION
+                  recovery_expression: 'last(/DeadlineTracking/fn.expiration.days.[{#TYPE}-{#ORGANISATION}-{#ID}-{#HASH}]) >= {$EXPIRATION_DAYS_TRIGGER}'
+                  name: 'Истечение срока: {#TYPE} - "{#ORGANISATION}" - {#ID}'
+                  priority: HIGH
+                  manual_close: 'YES'
+                  tags:
+                    - tag: deadline
+                      value: trigger
+          master_item:
+            key: 'custom.parser.file.json.fn[{$FILE_PATH},{$SEPARATOR}]'
+          lld_macro_paths:
+            - lld_macro: '{#EXPIRATION_DATE}'
+              path: $.expiration_date
+            - lld_macro: '{#HASH}'
+              path: $.hash
+            - lld_macro: '{#ID}'
+              path: $.id
+            - lld_macro: '{#NOTE}'
+              path: $.note
+            - lld_macro: '{#ORGANISATION}'
+              path: $.organisation
+            - lld_macro: '{#TYPE}'
+              path: $.type
+      macros:
+        - macro: '{$EXPIRATION_DAYS_TRIGGER}'
+          value: '30'
+          description: 'Запас дней перед истечением даты'
